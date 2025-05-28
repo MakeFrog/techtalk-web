@@ -1,6 +1,11 @@
-export default function BlogDetailPage({ params }: { params: { id: string } }) {
-    return <div>
-        <h1>블로그 상세 페이지</h1>
-        <p>id: {params.id}</p>
+import Content from "./components/Content/Content";
+import OriginBlog from "./components/OriginBlog/OriginBlog";
+import { container } from "./page.css";
+
+export default function BlogDetailPage({ params }: { params: { id: string, deatilId: string } }) {
+    return <div className={container}>
+        <Content />
+        <OriginBlog />
     </div>
-}
+
+}   

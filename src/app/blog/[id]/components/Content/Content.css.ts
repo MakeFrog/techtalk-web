@@ -2,7 +2,6 @@ import { style } from '@vanilla-extract/css';
 import { SizeConfig } from '@/styles/SizeConfig';
 
 export const container = style({
-    backgroundColor: '#95C8D8',
     margin: '0 auto',
     width: '100%',
     maxWidth: '672px',

@@ -1,5 +1,6 @@
 import { style } from "@vanilla-extract/css";
 import { textStyles } from "@/styles/TextStyles";
+import { ColorSet } from "@/styles/ColorSet";
 
 export const container = style({
     marginBottom: 32,
@@ -79,4 +80,22 @@ export const italic = style({
 
 export const textSpan = style({
     // 일반 텍스트용 스타일
+});
+
+export const conceptKeyword = style({
+    display: 'inline',
+    color: 'inherit',
+    textDecoration: 'underline',
+    textDecorationStyle: 'dotted',
+    textDecorationColor: ColorSet.gray3,
+    textUnderlineOffset: '3px',
+    textDecorationThickness: '1.5px',
+    cursor: 'pointer',
+    fontWeight: 500,
+    ':hover': {
+        textDecoration: 'none',
+        backgroundColor: '#EBF4FF',
+        borderRadius: 2,
+        padding: '1px 2px',
+    }
 });   

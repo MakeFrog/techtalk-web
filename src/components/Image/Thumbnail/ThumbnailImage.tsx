@@ -26,6 +26,20 @@ function parseAspectRatio(ratio?: number | string): number | undefined {
     return isNaN(asNum) ? undefined : asNum;
 }
 
+/**
+ * Next.js에서 허용된 도메인인지 확인
+ * 현재는 velog.velcdn.com만 허용됨
+ */
+function isAllowedDomain(src: string): boolean {
+    try {
+        const url = new URL(src);
+        const allowedDomains = ['velog.velcdn.com'];
+        return allowedDomains.includes(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
 export function ThumbnailImage({
     src,
     alt = '',
@@ -38,6 +52,7 @@ export function ThumbnailImage({
     borderRadius = 16,
 }: ThumbnailImageProps) {
     const [loaded, setLoaded] = useState(false);
+    const isAllowed = isAllowedDomain(src);
 
     const ratio = parseAspectRatio(aspectRatio);
     let imgWidth: number | undefined = undefined;
@@ -81,18 +96,43 @@ export function ThumbnailImage({
                     transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1)',
                 }}
             />
-            <Image
-                src={src}
-                alt={alt}
-                className={styles.image}
-                style={{ borderRadius, transition: 'opacity 0.3s' }}
-                width={imgWidth || 672}
-                height={imgHeight || 378}
-                loading="lazy"
-                sizes="100vw"
-                draggable={false}
-                onLoadingComplete={() => setLoaded(true)}
-            />
+
+            {/* 허용된 도메인이면 Next.js Image, 아니면 일반 img 태그 사용 */}
+            {isAllowed ? (
+                <Image
+                    src={src}
+                    alt={alt}
+                    className={styles.image}
+                    style={{
+                        borderRadius,
+                        transition: 'opacity 0.3s',
+                        border: '0.5px solid #E0E0E0'
+                    }}
+                    width={imgWidth || 672}
+                    height={imgHeight || 378}
+                    loading="lazy"
+                    sizes="100vw"
+                    draggable={false}
+                    onLoadingComplete={() => setLoaded(true)}
+                />
+            ) : (
+                <img
+                    src={src}
+                    alt={alt}
+                    className={styles.image}
+                    style={{
+                        borderRadius,
+                        transition: 'opacity 0.3s',
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        border: '0.5px solid #E0E0E0'
+                    }}
+                    loading="lazy"
+                    draggable={false}
+                    onLoad={() => setLoaded(true)}
+                />
+            )}
         </div>
     );
 }

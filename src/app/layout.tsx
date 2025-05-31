@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../styles/globals.css";
+import { TechSetCacheProvider } from "@/components/providers/TechSetCacheProvider";
 
 
 const geistSans = Geist({
@@ -26,7 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <TechSetCacheProvider>
+          {children}
+        </TechSetCacheProvider>
       </body>
     </html>
   );

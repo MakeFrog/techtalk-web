@@ -18,4 +18,4 @@ export const originBlogSection = style({
     width: '39%',
     height: '100vh',
     overflowY: 'auto',
-});             
+});

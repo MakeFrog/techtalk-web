@@ -1,23 +1,52 @@
-import React from "react";
-import { orderedList, listItem } from "./QuestionListView.css";
+import React, { useMemo } from "react";
+import { parseMarkdownWithPreset } from '@/utils/markdownParser';
+import { orderedList, listItem, questionContent, questionNumber } from "./QuestionListView.css.ts";
 
-const questions = [
-    "React의 Virtual DOM이 무엇이며, 실제 DOM과 비교했을 때 어떤 장점이 있는지 설명해주세요.",
-    "JavaScript의 이벤트 루프와 비동기 처리 방식에 대해 설명해주세요. Promise와 async/await의 차이점도 함께 설명해주세요.",
-    "브라우저의 렌더링 과정을 설명하고, Critical Rendering Path를 최적화하는 방법에 대해 설명해주세요.",
-    "웹 성능 최적화를 위한 다양한 기법들에 대해 설명해주세요. 코드 분할(Code Splitting), 레이지 로딩(Lazy Loading), 이미지 최적화 등을 포함해서 설명해주세요.",
-    "RESTful API와 GraphQL의 차이점과 각각의 장단점에 대해 설명해주세요.",
-
+// 목 데이터 - 정적 면접 질문들 (마크다운 지원)
+const MOCK_QUESTIONS = [
+    "React의 `useEffect` Hook의 의존성 배열은 어떤 역할을 하나요?",
+    "**Next.js**에서 `SSR`과 `SSG`의 차이점은 무엇인가요?",
+    "TypeScript의 **타입 가드(Type Guard)**는 언제 사용하나요?",
+    "React의 메모이제이션 기법들(`useMemo`, `useCallback`, `React.memo`)은 언제 사용해야 하나요?",
+    "**Virtual DOM**과 실제 DOM의 차이점과 React가 Virtual DOM을 사용하는 이유는 무엇인가요?"
 ];
 
-const QuestionListViewComponent = () => {
+// 개별 질문 아이템 컴포넌트
+interface QuestionItemProps {
+    question: string;
+    index: number;
+}
+
+const QuestionItem = React.memo(function QuestionItem({ question, index }: QuestionItemProps) {
+    // 프리셋을 사용한 마크다운 파싱을 메모이제이션하여 성능 최적화
+    const parsedQuestion = useMemo(() => {
+        return parseMarkdownWithPreset(question, 'question');
+    }, [question]);
+
+    return (
+        <li className={listItem}>
+            <span className={questionNumber}>{index + 1}</span>
+            <div className={questionContent}>
+                {parsedQuestion}
+            </div>
+        </li>
+    );
+});
+
+/**
+ * 면접 질문 리스트를 표시하는 컴포넌트 (정적 버전)
+ * 개선된 마크다운 파싱으로 코드나 강조 표시가 정확히 렌더링
+ */
+export function QuestionListView() {
     return (
         <ol className={orderedList}>
-            {questions.map((q, idx) => (
-                <li key={idx} className={listItem}>{q}</li>
+            {MOCK_QUESTIONS.map((question, index) => (
+                <QuestionItem
+                    key={`question-${index}`}
+                    question={question}
+                    index={index}
+                />
             ))}
         </ol>
     );
-};
-
-export const QuestionListView = React.memo(QuestionListViewComponent);              
+} 

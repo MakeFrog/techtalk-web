@@ -9,7 +9,33 @@ interface ParseMarkdownOptions {
     blockquoteClassName?: string;
     boldClassName?: string;
     italicClassName?: string;
+    conceptKeywordClassName?: string;
+    onConceptClick?: (keyword: string, event: React.MouseEvent) => void;
 }
+
+// 공통 마크다운 스타일 프리셋
+export const MARKDOWN_STYLE_PRESETS = {
+    insight: {
+        inlineCodeClassName: 'insight-inline-code',
+        textSpanClassName: 'insight-text-span',
+        codeBlockClassName: 'insight-code-block',
+        blockquoteClassName: 'insight-blockquote',
+        boldClassName: 'insight-bold',
+        italicClassName: 'insight-italic',
+    },
+    question: {
+        inlineCodeClassName: 'question-inline-code',
+        textSpanClassName: 'question-text-span',
+        boldClassName: 'question-bold',
+        italicClassName: 'question-italic',
+    },
+    comment: {
+        inlineCodeClassName: 'comment-inline-code',
+        textSpanClassName: 'comment-text-span',
+        boldClassName: 'comment-bold',
+        italicClassName: 'comment-italic',
+    }
+} as const;
 
 /**
  * 전체 마크다운을 파싱하여 JSX 요소로 변환
@@ -24,7 +50,9 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
         codeBlockClassName = '',
         blockquoteClassName = '',
         boldClassName = '',
-        italicClassName = ''
+        italicClassName = '',
+        conceptKeywordClassName = '',
+        onConceptClick
     } = options;
 
     // 코드 블록 파싱 (```으로 감싸진 부분)
@@ -45,7 +73,9 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
                 textSpanClassName,
                 blockquoteClassName,
                 boldClassName,
-                italicClassName
+                italicClassName,
+                conceptKeywordClassName,
+                onConceptClick
             }, elements.length));
         }
 
@@ -91,7 +121,9 @@ const parseInlineElements = (
         textSpanClassName = '',
         blockquoteClassName = '',
         boldClassName = '',
-        italicClassName = ''
+        italicClassName = '',
+        conceptKeywordClassName = '',
+        onConceptClick
     } = options;
 
     // 줄 단위로 분리하여 인용문 처리
@@ -108,7 +140,9 @@ const parseInlineElements = (
                         inlineCodeClassName,
                         textSpanClassName,
                         boldClassName,
-                        italicClassName
+                        italicClassName,
+                        conceptKeywordClassName,
+                        onConceptClick
                     }, `${baseKey}-${lineIndex}`)}
                 </blockquote>
             );
@@ -120,7 +154,9 @@ const parseInlineElements = (
                         inlineCodeClassName,
                         textSpanClassName,
                         boldClassName,
-                        italicClassName
+                        italicClassName,
+                        conceptKeywordClassName,
+                        onConceptClick
                     }, `${baseKey}-${lineIndex}`)}
                 </div>
             );
@@ -136,7 +172,7 @@ const parseInlineElements = (
 };
 
 /**
- * 텍스트 포맷팅 요소들을 파싱 (인라인 코드, 볼드, 이탤릭)
+ * 텍스트 포맷팅 요소들을 파싱 (인라인 코드, 볼드, 이탤릭, concept 링크)
  */
 const parseTextFormatting = (
     text: string,
@@ -147,29 +183,53 @@ const parseTextFormatting = (
         inlineCodeClassName = '',
         textSpanClassName = '',
         boldClassName = '',
-        italicClassName = ''
+        italicClassName = '',
+        conceptKeywordClassName = '',
+        onConceptClick
     } = options;
 
-    // 인라인 코드 먼저 처리 (`code`)
-    const inlineCodeParts = text.split(/(`[^`]+`)/g);
+    // concept 링크 먼저 처리 ([keyword](concept:keyword))
+    const conceptLinkParts = text.split(/(\[[^\]]+\]\(concept:[^)]+\))/g);
     const elements: React.ReactNode[] = [];
 
-    inlineCodeParts.forEach((part, index) => {
-        if (part.startsWith('`') && part.endsWith('`')) {
-            // 인라인 코드
-            const codeText = part.slice(1, -1);
+    conceptLinkParts.forEach((part, index) => {
+        const conceptMatch = part.match(/\[([^\]]+)\]\(concept:([^)]+)\)/);
+
+        if (conceptMatch) {
+            // concept 링크
+            const [, displayText, keyword] = conceptMatch;
             elements.push(
-                <code key={`${baseKey}-code-${index}`} className={inlineCodeClassName}>
-                    {codeText}
-                </code>
+                <span
+                    key={`${baseKey}-concept-${index}`}
+                    className={conceptKeywordClassName}
+                    onClick={(e) => onConceptClick?.(keyword, e)}
+                    style={{ cursor: 'pointer' }}
+                >
+                    {displayText}
+                </span>
             );
         } else {
-            // 볼드/이탤릭 처리
-            elements.push(...parseBoldItalic(part, {
-                textSpanClassName,
-                boldClassName,
-                italicClassName
-            }, `${baseKey}-${index}`));
+            // 인라인 코드 처리 (`code`)
+            const inlineCodeParts = part.split(/(`[^`]+`)/g);
+
+            inlineCodeParts.forEach((codePart, codeIndex) => {
+                if (codePart.startsWith('`') && codePart.endsWith('`')) {
+                    // 인라인 코드
+                    const codeText = codePart.slice(1, -1);
+                    elements.push(
+                        <code key={`${baseKey}-code-${index}-${codeIndex}`} className={inlineCodeClassName}>
+                            {codeText}
+                        </code>
+                    );
+                } else {
+                    // 볼드/이탤릭 처리
+                    elements.push(...parseBoldItalic(codePart, {
+                        textSpanClassName,
+                        boldClassName,
+                        italicClassName
+                    }, `${baseKey}-${index}-${codeIndex}`));
+                }
+            });
         }
     });
 
@@ -177,7 +237,7 @@ const parseTextFormatting = (
 };
 
 /**
- * 볼드와 이탤릭을 파싱
+ * 볼드와 이탤릭을 파싱 (개선된 정규식 사용)
  */
 const parseBoldItalic = (
     text: string,
@@ -186,13 +246,13 @@ const parseBoldItalic = (
 ): React.ReactNode[] => {
     const { textSpanClassName = '', boldClassName = '', italicClassName = '' } = options;
 
-    // 볼드 처리 (**text**)
-    const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
+    // 볼드 처리 (**text**) - 개선된 정규식으로 더 넓은 범위 지원
+    const boldParts = text.split(/(\*\*[^\*]*?\*\*)/g);
     const elements: React.ReactNode[] = [];
 
     boldParts.forEach((part, index) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-            // 볼드 텍스트
+        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+            // 볼드 텍스트 (최소 1글자는 있어야 함)
             const boldText = part.slice(2, -2);
             elements.push(
                 <strong key={`${baseKey}-bold-${index}`} className={boldClassName}>
@@ -200,12 +260,13 @@ const parseBoldItalic = (
                 </strong>
             );
         } else {
-            // 이탤릭 처리 (*text*)
-            const italicParts = part.split(/(\*[^*]+\*)/g);
+            // 이탤릭 처리 (*text*) - 볼드가 아닌 경우만
+            const italicParts = part.split(/(\*[^\*]+?\*)/g);
 
             italicParts.forEach((italicPart, italicIndex) => {
-                if (italicPart.startsWith('*') && italicPart.endsWith('*') && !italicPart.startsWith('**')) {
-                    // 이탤릭 텍스트
+                if (italicPart.startsWith('*') && italicPart.endsWith('*') &&
+                    !italicPart.startsWith('**') && italicPart.length > 2) {
+                    // 이탤릭 텍스트 (최소 1글자는 있어야 함)
                     const italicText = italicPart.slice(1, -1);
                     elements.push(
                         <em key={`${baseKey}-italic-${index}-${italicIndex}`} className={italicClassName}>
@@ -225,6 +286,20 @@ const parseBoldItalic = (
     });
 
     return elements;
+};
+
+/**
+ * 프리셋을 사용한 마크다운 파싱 헬퍼
+ */
+export const parseMarkdownWithPreset = (
+    text: string,
+    preset: keyof typeof MARKDOWN_STYLE_PRESETS,
+    additionalOptions: Partial<ParseMarkdownOptions> = {}
+) => {
+    return parseMarkdown(text, {
+        ...MARKDOWN_STYLE_PRESETS[preset],
+        ...additionalOptions
+    });
 };
 
 /**

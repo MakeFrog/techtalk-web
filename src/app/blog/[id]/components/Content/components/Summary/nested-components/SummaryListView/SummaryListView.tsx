@@ -1,10 +1,23 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { parseMarkdown } from '@/utils/markdownParser';
 import { SUMMARY_DATA, SummaryItemEntity, generateAnchorId } from '../../types/summaryItemEntity';
+import { MOCK_BLOG_DATA, ProgrammingConcept } from '../../types/mockData';
+import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
 import * as styles from './SummaryListView.css';
 
 interface SummaryListItemProps {
     content: string;
+    concepts: ProgrammingConcept[];
+    onConceptClick: (keyword: string, event: React.MouseEvent) => void;
+}
+
+interface PopupState {
+    isVisible: boolean;
+    keyword: string;
+    description: string;
+    position: { x: number; y: number };
 }
 
 // 인용문으로 시작하는지 확인하는 유틸 함수
@@ -13,7 +26,7 @@ const isBlockquoteContent = (content: string): boolean => {
 };
 
 // 개별 리스트 아이템 컴포넌트 - 메모이제이션으로 최적화
-const SummaryListItem = React.memo(({ content }: SummaryListItemProps) => {
+const SummaryListItem = React.memo(({ content, concepts, onConceptClick }: SummaryListItemProps) => {
     const isQuote = isBlockquoteContent(content);
 
     return (
@@ -25,6 +38,8 @@ const SummaryListItem = React.memo(({ content }: SummaryListItemProps) => {
                 blockquoteClassName: styles.blockquote,
                 boldClassName: styles.bold,
                 italicClassName: styles.italic,
+                conceptKeywordClassName: styles.conceptKeyword,
+                onConceptClick,
             })}
         </li>
     );
@@ -33,7 +48,15 @@ const SummaryListItem = React.memo(({ content }: SummaryListItemProps) => {
 SummaryListItem.displayName = 'SummaryListItem';
 
 // 개별 섹션 컴포넌트 - 메모이제이션으로 최적화
-const SummaryItemComponent = React.memo(({ item }: { item: SummaryItemEntity }) => {
+const SummaryItemComponent = React.memo(({
+    item,
+    concepts,
+    onConceptClick
+}: {
+    item: SummaryItemEntity;
+    concepts: ProgrammingConcept[];
+    onConceptClick: (keyword: string, event: React.MouseEvent) => void;
+}) => {
     return (
         <section id={generateAnchorId(item.title, item.id)} className={styles.sectionContent}>
             <h2 className={styles.sectionTitle}>
@@ -41,7 +64,12 @@ const SummaryItemComponent = React.memo(({ item }: { item: SummaryItemEntity }) 
             </h2>
             <ul className={styles.bulletList}>
                 {item.content.map((paragraph, idx) => (
-                    <SummaryListItem key={idx} content={paragraph} />
+                    <SummaryListItem
+                        key={idx}
+                        content={paragraph}
+                        concepts={concepts}
+                        onConceptClick={onConceptClick}
+                    />
                 ))}
             </ul>
         </section>
@@ -51,12 +79,61 @@ const SummaryItemComponent = React.memo(({ item }: { item: SummaryItemEntity }) 
 SummaryItemComponent.displayName = 'SummaryItem';
 
 const SummaryListViewComponent = () => {
+    const [popupState, setPopupState] = useState<PopupState>({
+        isVisible: false,
+        keyword: '',
+        description: '',
+        position: { x: 0, y: 0 }
+    });
+
+    const handleConceptClick = (keyword: string, event: React.MouseEvent) => {
+        event.preventDefault();
+
+        // 해당 키워드의 설명 찾기
+        const concept = MOCK_BLOG_DATA.programming_concepts.find(
+            concept => concept.keyword === keyword
+        );
+
+        if (concept) {
+            setPopupState({
+                isVisible: true,
+                keyword: concept.keyword,
+                description: concept.description,
+                position: {
+                    x: event.clientX,
+                    y: event.clientY
+                }
+            });
+        }
+    };
+
+    const handleClosePopup = () => {
+        setPopupState(prev => ({ ...prev, isVisible: false }));
+    };
+
     return (
-        <div className={styles.container}>
-            {SUMMARY_DATA.map((item) => (
-                <SummaryItemComponent key={item.id} item={item} />
-            ))}
-        </div>
+        <>
+            <div className={styles.container}>
+                {SUMMARY_DATA.map((item) => (
+                    <SummaryItemComponent
+                        key={item.id}
+                        item={item}
+                        concepts={MOCK_BLOG_DATA.programming_concepts}
+                        onConceptClick={handleConceptClick}
+                    />
+                ))}
+            </div>
+
+            {/* 팝업 */}
+            {popupState.isVisible && (
+                <ConceptPopup
+                    keyword={popupState.keyword}
+                    description={popupState.description}
+                    position={popupState.position}
+                    onClose={handleClosePopup}
+                />
+            )}
+        </>
     );
 };
 

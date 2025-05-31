@@ -18,12 +18,16 @@ export function QuestionSectionView() {
 
     // BlogBasicInfoProvider에서 제목과 내용이 로드되면 질문 생성 시작
     useEffect(() => {
-        if (state.status === 'success') {
+        if (state.status === 'success' && questions.length === 0 && !isLoading) {
             const { title, content } = state.data;
-            console.log('🚀 [QuestionSectionView] 질문 생성 시작');
+            console.log('🚀 [QuestionSectionView] 질문 생성 시작:', {
+                hasQuestions: questions.length > 0,
+                isLoading,
+                title: title.substring(0, 50) + '...'
+            });
             generateQuestions(title, content);
         }
-    }, [state, generateQuestions]);
+    }, [state, questions.length, isLoading]);
 
     return (
         <div style={{

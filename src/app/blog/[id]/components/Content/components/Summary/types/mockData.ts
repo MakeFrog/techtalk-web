@@ -38,6 +38,13 @@ export const MOCK_BLOG_DATA: BlogAnalysisData = {
             answer: "해당 이벤트를 Mixin Class에 정의해두면 다른 페이지에서 Mixin Class를 인스턴스화하여 메서드를 호출함으로써 쉽게 재사용할 수 있습니다."
         }
     ],
+    toc: [
+        "1. 🤔 Riverpod 사용 시 전역 Provider의 위험성과 해결책",
+        "2. 🧩 Mixin Class를 활용한 전역 Provider 구조화 방법",
+        "3. 🌱 State Mixin Class와 Event Mixin Class 분리 및 역할 정의",
+        "4. 🔄 Mixin Class를 활용한 코드 재사용 및 유지보수 효율 증대"
+    ],
+
     programming_concepts: [
         {
             keyword: "Riverpod",
@@ -60,12 +67,7 @@ export const MOCK_BLOG_DATA: BlogAnalysisData = {
             description: "앱 전체에서 접근 가능하고 공유되는 상태를 의미하며, Riverpod의 Provider를 통해 효과적으로 관리할 수 있습니다. 하지만 과도한 사용은 사이드 이펙트를 유발할 수 있으므로 주의해야 합니다."
         }
     ],
-    toc: [
-        "1. 🤔 Riverpod 사용 시 전역 Provider의 위험성과 해결책",
-        "2. 🧩 Mixin Class를 활용한 전역 Provider 구조화 방법",
-        "3. 🌱 State Mixin Class와 Event Mixin Class 분리 및 역할 정의",
-        "4. 🔄 Mixin Class를 활용한 코드 재사용 및 유지보수 효율 증대"
-    ],
+
     summary: `## 🤔 [Riverpod](concept:Riverpod) 사용 시 [전역 상태](concept:전역 상태)의 위험성과 해결책
 
 - [Riverpod](concept:Riverpod)의 [Provider](concept:Provider)는 편리하지만, 어디서든 접근 가능하다는 점이 위험 요소를 야기할 수 있습니다.

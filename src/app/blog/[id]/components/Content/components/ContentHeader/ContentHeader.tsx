@@ -47,6 +47,8 @@ export default function ContentHeader() {
                 <ThumbnailImage
                     src={thumbnailUrl}
                     alt={blogTitle}
+                    aspectRatio="12/6"
+                    borderRadius={12}
                     style={{ marginBottom: '20px' }}
                 />
             )}

@@ -1,27 +1,28 @@
 import React, { useMemo } from "react";
 import { parseMarkdownWithPreset } from '@/utils/markdownParser';
-import { orderedList, listItem, questionContent, questionNumber } from "./QuestionListView.css.ts";
+import { Question } from "@/domains/blog/hooks/useQuestionStream";
+import { LoadingSpinner } from '@/components/loading/LoadingSpinner';
+import {
+    orderedList,
+    listItem,
+    questionContent,
+    questionNumber,
+    loadingContainer,
+    errorContainer,
+    emptyContainer
+} from "./QuestionListView.css";
 
-// 목 데이터 - 정적 면접 질문들 (마크다운 지원)
-const MOCK_QUESTIONS = [
-    "React의 `useEffect` Hook의 의존성 배열은 어떤 역할을 하나요?",
-    "**Next.js**에서 `SSR`과 `SSG`의 차이점은 무엇인가요?",
-    "TypeScript의 **타입 가드(Type Guard)**는 언제 사용하나요?",
-    "React의 메모이제이션 기법들(`useMemo`, `useCallback`, `React.memo`)은 언제 사용해야 하나요?",
-    "**Virtual DOM**과 실제 DOM의 차이점과 React가 Virtual DOM을 사용하는 이유는 무엇인가요?"
-];
-
-// 개별 질문 아이템 컴포넌트
+// 개별 질문 아이템 컴포넌트 - 질문만 표시 (답변은 숨김)
 interface QuestionItemProps {
-    question: string;
+    question: Question;
     index: number;
 }
 
 const QuestionItem = React.memo(function QuestionItem({ question, index }: QuestionItemProps) {
-    // 프리셋을 사용한 마크다운 파싱을 메모이제이션하여 성능 최적화
+    // 질문 마크다운 파싱
     const parsedQuestion = useMemo(() => {
-        return parseMarkdownWithPreset(question, 'question');
-    }, [question]);
+        return parseMarkdownWithPreset(question.question, 'question');
+    }, [question.question]);
 
     return (
         <li className={listItem}>
@@ -33,14 +34,48 @@ const QuestionItem = React.memo(function QuestionItem({ question, index }: Quest
     );
 });
 
+interface QuestionListViewProps {
+    questions: Question[];
+    isLoading: boolean;
+    error: string | null;
+}
+
 /**
- * 면접 질문 리스트를 표시하는 컴포넌트 (정적 버전)
- * 개선된 마크다운 파싱으로 코드나 강조 표시가 정확히 렌더링
+ * 면접 질문 리스트를 표시하는 컴포넌트
+ * 질문만 표시하고 답변은 숨김 (데이터는 유지하여 추후 기능 확장 가능)
  */
-export function QuestionListView() {
+export function QuestionListView({ questions, isLoading, error }: QuestionListViewProps) {
+    if (error) {
+        return (
+            <div className={errorContainer}>
+                오류가 발생했습니다: {error}
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className={loadingContainer}>
+                <LoadingSpinner
+                    size="medium"
+                    layout="center"
+                    message="면접 질문을 생성하고 있습니다..."
+                />
+            </div>
+        );
+    }
+
+    if (questions.length === 0) {
+        return (
+            <div className={emptyContainer}>
+                아직 생성된 질문이 없습니다.
+            </div>
+        );
+    }
+
     return (
         <ol className={orderedList}>
-            {MOCK_QUESTIONS.map((question, index) => (
+            {questions.map((question, index) => (
                 <QuestionItem
                     key={`question-${index}`}
                     question={question}

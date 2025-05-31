@@ -1,5 +1,48 @@
-import { style, globalStyle } from '@vanilla-extract/css';
+import { style, globalStyle, keyframes } from '@vanilla-extract/css';
 import { textStyles } from '@/styles/TextStyles';
+
+// 스핀 애니메이션 (레거시 지원용)
+const spin = keyframes({
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+});
+
+// 레거시 스피너 클래스 (하위 호환성)
+export const spinner = style({
+    display: 'inline-block',
+    width: '20px',
+    height: '20px',
+    border: '2px solid #e5e7eb',
+    borderTopColor: '#3b82f6',
+    borderRadius: '50%',
+    marginBottom: '12px',
+    animation: `${spin} 1s linear infinite`,
+});
+
+// 상태별 컨테이너 스타일들
+export const loadingContainer = style({
+    padding: '40px',
+    textAlign: 'center',
+    color: '#6b7280',
+});
+
+export const errorContainer = style({
+    padding: '20px',
+    textAlign: 'center',
+    color: '#ef4444',
+    backgroundColor: '#fef2f2',
+    borderRadius: '8px',
+    border: '1px solid #fecaca',
+});
+
+export const emptyContainer = style({
+    padding: '40px',
+    textAlign: 'center',
+    color: '#6b7280',
+    backgroundColor: '#f9fafb',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+});
 
 // 순서 있는 리스트 스타일
 export const orderedList = style({

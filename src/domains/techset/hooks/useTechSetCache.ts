@@ -17,8 +17,8 @@ type TechSetCacheResult =
     | { status: 'success'; error: null }
     | { status: 'error'; error: string };
 
-const SKILLS_COLLECTION = 'Skills';
-const JOB_GROUPS_COLLECTION = 'JobGroups';
+const SKILLS_COLLECTION = 'Skill';
+const JOB_GROUPS_COLLECTION = 'JobGroup';
 
 // 세션 스토리지 키
 const CACHE_SESSION_KEY = 'techset-cache-loaded';
@@ -114,12 +114,21 @@ export function useTechSetCache(): TechSetCacheResult {
                 return;
             }
 
-            // 세션 캐시가 유효하면 성공으로 처리 (실제 데이터는 없어도 됨)
-            if (isSessionCacheValid()) {
-                console.log('✅ [TechSetCache] 세션 캐시 유효함, Firestore 호출 생략');
+            // 세션 캐시가 유효하더라도 메모리 캐시에 실제 데이터가 없으면 Firestore에서 가져와야 함
+            const hasActualData = techSetRepository.getAllSkills().length > 0 || techSetRepository.getAllJobGroups().length > 0;
+
+            if (isSessionCacheValid() && hasActualData) {
+                console.log('✅ [TechSetCache] 세션 캐시 유효하고 메모리에 데이터 있음, Firestore 호출 생략');
                 techSetRepository.setCacheStatus('loaded');
                 setResult({ status: 'success', error: null });
                 return;
+            }
+
+            // 세션 캐시가 있어도 실제 데이터가 없으면 로드 필요
+            if (isSessionCacheValid() && !hasActualData) {
+                console.log('⚠️ [TechSetCache] 세션 캐시는 있지만 메모리에 데이터 없음, Firestore에서 로드');
+            } else if (!isSessionCacheValid()) {
+                console.log('🔄 [TechSetCache] 세션 캐시 만료 또는 없음, Firestore에서 로드');
             }
 
             try {

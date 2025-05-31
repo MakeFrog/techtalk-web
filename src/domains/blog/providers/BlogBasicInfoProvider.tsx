@@ -3,18 +3,14 @@
 import { createContext, useContext, ReactNode, useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
-import { techSetRepository } from '@/domains/techset/repositories/TechSetCacheRepository';
 
 // 블로그 기본 정보 데이터 타입
 interface BlogBasicInfoData {
     title: string;
     content: string;
     thumbnailUrl?: string;
-    relatedTechSets: Array<{
-        id: string;
-        name: string;
-        type: 'skill' | 'jobGroup';
-    }>;
+    skillIds: string[];
+    jobGroupIds: string[];
 }
 
 // 블로그 기본 정보 상태 타입 (Discriminated Union)
@@ -46,96 +42,6 @@ interface BlogFirestoreData {
     related_job_group_ids?: string[];
 }
 
-// TechSet ID를 이름으로 매핑하는 유틸리티 함수
-function mapIdsToTechSetItems(
-    skillIds: string[],
-    jobGroupIds: string[]
-): Array<{ id: string; name: string; type: 'skill' | 'jobGroup' }> {
-    const result: Array<{ id: string; name: string; type: 'skill' | 'jobGroup' }> = [];
-
-    console.log('🔄 [TechSet 매핑] 입력 데이터:', { skillIds, jobGroupIds });
-
-    // TechSet 캐시 상태 확인 (캐시가 없어도 ID로 표시)
-    const cacheStatus = techSetRepository.getCacheStatus();
-    const isCacheReady = cacheStatus === 'loaded';
-
-    console.log('🔍 [TechSet 매핑] 캐시 상태:', cacheStatus, '준비 여부:', isCacheReady);
-
-    if (!isCacheReady) {
-        console.log('📚 [BlogBasicInfoProvider] TechSet 캐시 미준비, ID로 표시:', cacheStatus);
-    }
-
-    // 캐시가 준비된 경우 실제 데이터 확인
-    if (isCacheReady) {
-        const allSkills = techSetRepository.getAllSkills();
-        const allJobGroups = techSetRepository.getAllJobGroups();
-        console.log('📊 [TechSet 매핑] 캐시된 스킬 수:', allSkills.length);
-        console.log('📊 [TechSet 매핑] 캐시된 직군 수:', allJobGroups.length);
-
-        if (allSkills.length > 0) {
-            console.log('📊 [TechSet 매핑] 첫 번째 스킬 예시:', allSkills[0]);
-        }
-        if (allJobGroups.length > 0) {
-            console.log('📊 [TechSet 매핑] 첫 번째 직군 예시:', allJobGroups[0]);
-        }
-    }
-
-    // 스킬 매핑
-    skillIds.forEach(id => {
-        console.log(`🔧 [TechSet 매핑] 스킬 ID 처리: "${id}"`);
-        if (isCacheReady) {
-            const skill = techSetRepository.getSkillById(id);
-            console.log(`🔧 [TechSet 매핑] 스킬 검색 결과 (${id}):`, skill);
-            if (skill && skill.name) {
-                result.push({
-                    id,
-                    name: skill.name,
-                    type: 'skill'
-                });
-                console.log(`✅ [TechSet 매핑] 스킬 "${id}" → "${skill.name}" 성공`);
-                return;
-            }
-        }
-
-        // 캐시가 없거나 찾지 못하면 ID 그대로 사용
-        console.log(`⚠️ [TechSet 매핑] 스킬 ${id} 매핑 실패, ID "${id}" 그대로 사용`);
-        result.push({
-            id,
-            name: id,
-            type: 'skill'
-        });
-    });
-
-    // 직군 매핑
-    jobGroupIds.forEach(id => {
-        console.log(`👥 [TechSet 매핑] 직군 ID 처리: "${id}"`);
-        if (isCacheReady) {
-            const jobGroup = techSetRepository.getJobGroupById(id);
-            console.log(`👥 [TechSet 매핑] 직군 검색 결과 (${id}):`, jobGroup);
-            if (jobGroup && jobGroup.name) {
-                result.push({
-                    id,
-                    name: jobGroup.name,
-                    type: 'jobGroup'
-                });
-                console.log(`✅ [TechSet 매핑] 직군 "${id}" → "${jobGroup.name}" 성공`);
-                return;
-            }
-        }
-
-        // 캐시가 없거나 찾지 못하면 ID 그대로 사용
-        console.log(`⚠️ [TechSet 매핑] 직군 ${id} 매핑 실패, ID "${id}" 그대로 사용`);
-        result.push({
-            id,
-            name: id,
-            type: 'jobGroup'
-        });
-    });
-
-    console.log('✅ [TechSet 매핑] 완료 결과:', result);
-    return result;
-}
-
 /**
  * 블로그 기본 정보(메타데이터 + 본문)를 자식 컴포넌트들에게 제공하는 Provider
  * 
@@ -143,7 +49,6 @@ function mapIdsToTechSetItems(
  * - 블로그 메타데이터 (제목, 기술스택) 로딩
  * - 블로그 본문 콘텐츠 로딩
  * - 로딩 상태 및 에러 처리
- * - TechSet 캐시와 연동
  */
 export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoProviderProps) {
     const [state, setState] = useState<BlogBasicInfoState>({ status: 'loading' });
@@ -152,7 +57,8 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
         let isCancelled = false;
 
         async function loadBlogContent() {
-            console.log('📚 [BlogBasicInfoProvider] 데이터 로딩 시작:', documentId);
+            const startTime = performance.now();
+            console.log('📚 [BlogBasicInfoProvider] 데이터 로딩 시작:', documentId, `(시작 시간: ${startTime.toFixed(2)}ms)`);
             setState({ status: 'loading' });
 
             try {
@@ -161,12 +67,15 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
                 const contentDocRef = doc(firestore, 'Blogs', documentId, 'Content', 'content');
 
                 console.log('📚 [BlogBasicInfoProvider] 메타데이터 가져오기 시작:', blogDocRef.path);
+                const metadataStart = performance.now();
 
                 const [blogDoc, contentDoc] = await Promise.all([
                     getDoc(blogDocRef),
                     getDoc(contentDocRef)
                 ]);
 
+                const metadataEnd = performance.now();
+                console.log('📚 [BlogBasicInfoProvider] Firestore 조회 완료:', `${(metadataEnd - metadataStart).toFixed(2)}ms`);
                 console.log('📚 [BlogBasicInfoProvider] 메타데이터 로딩 완료:', blogDoc.exists());
                 console.log('📚 [BlogBasicInfoProvider] 콘텐츠 로딩 완료:', contentDoc.exists());
 
@@ -195,26 +104,24 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
                     hasThumbnail: !!blogData.thumbnail_url
                 });
 
-                // TechSet ID들을 이름으로 매핑
-                const relatedTechSets = mapIdsToTechSetItems(
-                    blogData.related_skill_ids || [],
-                    blogData.related_job_group_ids || []
-                );
-
                 const data: BlogBasicInfoData = {
                     title: blogData.title,
                     content,
                     thumbnailUrl: blogData.thumbnail_url,
-                    relatedTechSets
+                    skillIds: blogData.related_skill_ids || [],
+                    jobGroupIds: blogData.related_job_group_ids || []
                 };
 
                 setState({ status: 'success', data });
 
-                console.log('📚 [BlogBasicInfoProvider] 데이터 로딩 완료:', {
+                const endTime = performance.now();
+                const totalTime = endTime - startTime;
+                console.log('📚 [BlogBasicInfoProvider] 🚀 전체 로딩 완료:', {
                     title: data.title,
                     contentLength: data.content.length,
-                    techSetsCount: data.relatedTechSets.length,
-                    hasThumbnail: !!data.thumbnailUrl
+                    techSetsCount: data.skillIds.length + data.jobGroupIds.length,
+                    hasThumbnail: !!data.thumbnailUrl,
+                    totalLoadingTime: `${totalTime.toFixed(2)}ms` // 🎯 핵심 성능 지표
                 });
 
             } catch (error) {

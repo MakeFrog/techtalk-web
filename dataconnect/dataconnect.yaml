@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: "techtalkweb"
+location: "us-central1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        instanceId: "techtalkweb-fdc"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]

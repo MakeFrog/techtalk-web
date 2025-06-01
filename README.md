@@ -1,4 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TechTalk Web
+
+TechTalk 웹 애플리케이션
+
+## 🔥 Firebase 환경 설정
+
+### 환경별 프로젝트
+- **개발 환경**: `techtalk-dev-33`
+- **프로덕션 환경**: `techtalk-prod-32`
+
+### CLI 명령어
+
+#### 개발 서버 실행
+```bash
+# 기본 (prod 환경)
+npm run dev
+
+# dev Firebase 프로젝트 사용
+npm run dev:firebase-dev
+
+# prod Firebase 프로젝트 사용
+npm run dev:firebase-prod
+```
+
+#### 빌드
+```bash
+# dev 환경으로 빌드
+npm run build:dev
+
+# prod 환경으로 빌드
+npm run build:prod
+```
+
+#### 서버 시작
+```bash
+# dev 환경으로 시작
+npm run start:dev
+
+# prod 환경으로 시작
+npm run start:prod
+```
+
+### Firebase CLI 명령어
+
+#### 프로젝트 사용
+```bash
+# dev 환경 사용
+firebase use dev
+
+# prod 환경 사용
+firebase use prod
+
+# 기본 환경 사용
+firebase use default
+```
+
+#### 배포
+```bash
+# dev 환경에 배포
+firebase use dev && firebase deploy
+
+# prod 환경에 배포
+firebase use prod && firebase deploy
+```
+
+### 환경변수 설정
+
+`.env.local` 파일을 생성하여 로컬 개발 환경 설정:
+
+```env
+# Firebase 환경 설정
+NEXT_PUBLIC_FIREBASE_ENV=dev
+```
+
+또는 명령어 실행 시 직접 설정:
+
+```bash
+NEXT_PUBLIC_FIREBASE_ENV=dev npm run dev
+```
 
 ## Getting Started
 

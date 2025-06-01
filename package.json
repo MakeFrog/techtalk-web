@@ -4,8 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:firebase-dev": "NEXT_PUBLIC_FIREBASE_ENV=dev next dev",
+    "dev:firebase-prod": "NEXT_PUBLIC_FIREBASE_ENV=prod next dev",
     "build": "next build",
+    "build:dev": "NEXT_PUBLIC_FIREBASE_ENV=dev next build",
+    "build:prod": "NEXT_PUBLIC_FIREBASE_ENV=prod next build",
     "start": "next start",
+    "start:dev": "NEXT_PUBLIC_FIREBASE_ENV=dev next start",
+    "start:prod": "NEXT_PUBLIC_FIREBASE_ENV=prod next start",
     "lint": "next lint"
   },
   "dependencies": {

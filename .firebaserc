@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "techtalk-prod-32"
+    "default": "techtalk-prod-32",
+    "dev": "techtalk-dev-33",
+    "prod": "techtalk-prod-32"
   }
 }

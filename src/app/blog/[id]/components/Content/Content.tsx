@@ -76,7 +76,7 @@ export default function Content() {
                     color: '#64748b',
                     fontSize: '14px'
                 }}>
-                    블로그 데이터를 로딩 중입니다...
+                    {/* 블로그 데이터를 로딩 중입니다... */}
                 </div>
             </section>
         );

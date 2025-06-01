@@ -3,6 +3,8 @@ import { SizeConfig } from '@/styles/SizeConfig';
 
 export const container = style({
     margin: '0 auto',
+    marginTop: '24px',
+    marginBottom: '42px',
     width: '100%',
     maxWidth: '672px',
     boxSizing: 'border-box',

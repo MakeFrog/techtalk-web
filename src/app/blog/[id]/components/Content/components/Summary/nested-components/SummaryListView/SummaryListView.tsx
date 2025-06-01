@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { parseMarkdown } from '@/utils/markdownParser';
 import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
+import { LoadingSpinner } from '@/components/loading/LoadingSpinner/LoadingSpinner';
 import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
 import { useToc } from '@/domains/blog/hooks/useToc';
 import { useKeywords } from '@/domains/blog/hooks/useKeywords';
@@ -192,23 +193,39 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         );
     }
 
-    // 데이터 준비 중이면 빈 화면
-    if (!isDataReady) {
+    // 목차가 아직 생성되지 않았으면 아무것도 보여주지 않음
+    if (tocItems.length === 0) {
         return <div></div>;
+    }
+
+    // 목차는 생성되었지만 요약 스트리밍이 아직 시작되지 않은 경우 로딩 스피너 표시
+    if (summaryState.status === 'idle' || summaryState.status === 'loading') {
+        return (
+            <>
+                <div className={styles.container}>
+                    <LoadingSpinner
+                        size="medium"
+                        layout="center"
+                        message="전체 요약을 생성하고 있습니다..."
+                    />
+                </div>
+
+                {/* 팝업 */}
+                {popupState.isVisible && (
+                    <ConceptPopup
+                        keyword={popupState.keyword}
+                        description={popupState.description}
+                        position={popupState.position}
+                        onClose={handleClosePopup}
+                    />
+                )}
+            </>
+        );
     }
 
     // 요약 상태에 따른 렌더링
     const renderContent = () => {
         switch (summaryState.status) {
-            case 'idle':
-            case 'loading':
-                return (
-                    <div className={styles.loadingContainer}>
-                        <div className={styles.loadingSpinner}></div>
-                        <span>전체 요약을 생성하고 있습니다...</span>
-                    </div>
-                );
-
             case 'streaming':
             case 'completed':
                 return (

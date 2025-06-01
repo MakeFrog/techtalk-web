@@ -1,4 +1,5 @@
 import { style } from '@vanilla-extract/css';
+import { SizeConfig } from '@/styles/SizeConfig';
 
 export const container = style({
     display: 'flex',
@@ -12,10 +13,24 @@ export const contentSection = style({
     height: '100vh',
     overflowY: 'auto',
     scrollBehavior: 'smooth',
+
+    // 모바일에서는 전체 너비 사용
+    '@media': {
+        [`screen and (max-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
+            width: '100%',
+        }
+    }
 });
 
 export const originBlogSection = style({
     width: '39%',
     height: '100vh',
     overflowY: 'auto',
+
+    // 모바일에서는 숨김
+    '@media': {
+        [`screen and (max-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
+            display: 'none',
+        }
+    }
 });

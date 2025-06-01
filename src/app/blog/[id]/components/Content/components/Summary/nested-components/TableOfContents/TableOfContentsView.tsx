@@ -58,7 +58,7 @@ const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
     if (tocItems.length === 0) {
         return (
             <div className={container}>
-                <h2 className={title}>Table of Contents</h2>
+                <h2 className={title}>목차</h2>
                 <div className={loadingState}>목차를 불러오는 중...</div>
             </div>
         );

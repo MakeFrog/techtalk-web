@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
                 temperature: 0.7,
                 topK: 40,
                 topP: 0.95,
-                maxOutputTokens: 1000,
+                maxOutputTokens: 528,
             }
         });
 
@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
 
 ## 출력 형식
 - 2~3줄 내외의 간결하고 자연스러운 한국어 문장
-- 꼭 실무에 적용하거나 참고할 수 있는 가이드/베스트 프랙티스가 포함되도록 작성
+  - 마크다운 형식을 지원합니다
+  - 글의 맥락상 중요한 내용이거나 프로그래밍 키워드는 **볼드**로 강조하여 나타냅니다. (각 센션별로 최소 2개 이상) 
 - 형식적인 인사말이나 불필요한 도입부 없이 곧바로 요약 내용만 작성
 
 ### 📥 입력 데이터

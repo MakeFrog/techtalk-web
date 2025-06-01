@@ -32,10 +32,10 @@ export default function RootLayout({
       lang="en"
       style={{ colorScheme: 'light only' }}
     >
-      <head>
-        <meta name="color-scheme" content="light only" />
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable}`}
+        suppressHydrationWarning={true}
+      >
         <TechSetCacheProvider>
           {children}
         </TechSetCacheProvider>

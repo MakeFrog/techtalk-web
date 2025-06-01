@@ -58,7 +58,7 @@ export const inlineCode = style({
 });
 
 export const codeBlock = style({
-    marginBottom: 16,
+    marginBottom: 4,
     borderRadius: 8,
     // SyntaxHighlighter가 내부적으로 스타일링을 담당하므로 컨테이너 역할만
 });

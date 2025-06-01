@@ -69,6 +69,7 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
     const parts = text.split(codeBlockRegex);
 
     const elements: React.ReactNode[] = [];
+    let headingCounter = 1; // 전체 문서에서 제목 순서 관리
 
     for (let i = 0; i < parts.length; i += 3) {
         const textPart = parts[i];
@@ -77,7 +78,7 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
 
         // 일반 텍스트 부분 처리
         if (textPart) {
-            elements.push(...parseInlineElements(textPart, {
+            const { parsedElements, newHeadingCounter } = parseInlineElements(textPart, {
                 inlineCodeClassName,
                 textSpanClassName,
                 blockquoteClassName,
@@ -85,7 +86,10 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
                 italicClassName,
                 conceptKeywordClassName,
                 onConceptClick
-            }, elements.length));
+            }, elements.length, headingCounter);
+
+            elements.push(...parsedElements);
+            headingCounter = newHeadingCounter; // 카운터 업데이트
         }
 
         // 코드 블록 부분 처리 - SyntaxHighlighter 사용
@@ -98,6 +102,7 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
                         style={oneDark}
                         customStyle={{
                             margin: 0,
+                            padding: '8px 12px',
                             borderRadius: '8px',
                             fontSize: '14px',
                         }}
@@ -123,8 +128,9 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
 const parseInlineElements = (
     text: string,
     options: ParseMarkdownOptions,
-    baseKey: number
-): React.ReactNode[] => {
+    baseKey: number,
+    initialHeadingCounter: number
+): { parsedElements: React.ReactNode[]; newHeadingCounter: number } => {
     const {
         inlineCodeClassName = '',
         textSpanClassName = '',
@@ -138,7 +144,7 @@ const parseInlineElements = (
     // 줄 단위로 분리하여 각종 블록 요소 처리
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
-    let headingCounter = 1; // 제목 순서 카운터
+    let headingCounter = initialHeadingCounter; // 전달받은 카운터 사용
 
     lines.forEach((line, lineIndex) => {
         const trimmedLine = line.trim();
@@ -159,7 +165,8 @@ const parseInlineElements = (
                 원본: titleText,
                 포맷된제목: formattedTitle,
                 앵커ID: anchorId,
-                레벨: level
+                레벨: level,
+                현재카운터: headingCounter
             });
 
             elements.push(
@@ -169,7 +176,7 @@ const parseInlineElements = (
                     style: {
                         fontSize: level === 1 ? '1.8rem' : level === 2 ? '1.5rem' : level === 3 ? '1.3rem' : '1.1rem',
                         fontWeight: 'bold',
-                        margin: '20px 0 12px 0',
+                        margin: '20px 0 6px 0', // 하단 마진을 12px에서 6px로 줄임
                         lineHeight: '1.4',
                         color: '#1a1a1a'
                     }
@@ -188,6 +195,12 @@ const parseInlineElements = (
         // 리스트 아이템 처리 (- 또는 * 로 시작)
         else if (trimmedLine.match(/^[-*]\s+/)) {
             const listText = trimmedLine.replace(/^[-*]\s+/, '');
+            console.log(`🔍 [마크다운 파서] 리스트 아이템 처리:`, {
+                원본라인: line,
+                트림된라인: trimmedLine,
+                리스트텍스트: listText,
+                매칭결과: trimmedLine.match(/^[-*]\s+/)
+            });
             elements.push(
                 <div
                     key={`list-item-${baseKey}-${lineIndex}`}
@@ -196,19 +209,20 @@ const parseInlineElements = (
                         alignItems: 'flex-start',
                         margin: '8px 0',
                         paddingLeft: '16px',
-                        position: 'relative'
+                        position: 'relative',
+                        lineHeight: '1.5'
                     }}
                 >
                     <span
                         style={{
                             position: 'absolute',
                             left: '0',
-                            top: '0.5em',
+                            top: '0.75em',
                             width: '6px',
                             height: '6px',
                             borderRadius: '50%',
                             backgroundColor: '#666',
-                            marginTop: '-3px'
+                            transform: 'translateY(-50%)',
                         }}
                     />
                     <span style={{ flex: 1 }}>
@@ -246,6 +260,11 @@ const parseInlineElements = (
         }
         // 일반 텍스트 처리
         else {
+            console.log(`🔍 [마크다운 파서] 일반 텍스트 처리:`, {
+                원본라인: line,
+                트림된라인: trimmedLine,
+                라인인덱스: lineIndex
+            });
             elements.push(
                 <div key={`text-${baseKey}-${lineIndex}`} style={{ margin: '8px 0', lineHeight: '1.6' }}>
                     {parseTextFormatting(line, {
@@ -261,7 +280,7 @@ const parseInlineElements = (
         }
     });
 
-    return elements;
+    return { parsedElements: elements, newHeadingCounter: headingCounter };
 };
 
 /**
@@ -357,8 +376,8 @@ const parseBoldItalic = (
 ): React.ReactNode[] => {
     const { textSpanClassName = '', boldClassName = '', italicClassName = '' } = options;
 
-    // 볼드 처리 (**text**) - 개선된 정규식으로 더 넓은 범위 지원
-    const boldParts = text.split(/(\*\*[^\*]*?\*\*)/g);
+    // 볼드 처리 (**text**) - 수정된 정규식: 최소 1글자 이상 필요
+    const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
     const elements: React.ReactNode[] = [];
 
     boldParts.forEach((part, index) => {
@@ -372,7 +391,7 @@ const parseBoldItalic = (
             );
         } else {
             // 이탤릭 처리 (*text*) - 볼드가 아닌 경우만
-            const italicParts = part.split(/(\*[^\*]+?\*)/g);
+            const italicParts = part.split(/(\*[^*]+\*)/g);
 
             italicParts.forEach((italicPart, italicIndex) => {
                 if (italicPart.startsWith('*') && italicPart.endsWith('*') &&

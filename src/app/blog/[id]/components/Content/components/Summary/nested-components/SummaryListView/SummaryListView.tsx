@@ -110,10 +110,36 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         setPopupState(prev => ({ ...prev, isVisible: false }));
     }, []);
 
+    // 마크다운 텍스트 전처리 함수 - 불필요한 공백 제거
+    const preprocessMarkdown = useCallback((text: string): string => {
+        const processed = text
+            // 제목 뒤의 빈 줄 제거 (## 제목\n\n- 리스트 -> ## 제목\n- 리스트)
+            .replace(/^(#{1,6}.*)\n\n(-|\*)/gm, '$1\n$2')
+            // 코드 블록 전후의 과도한 빈 줄 제거
+            .replace(/\n\n```/g, '\n```')
+            .replace(/```\n\n/g, '```\n')
+            // 연속된 빈 줄을 하나로 통합 (최대 2개 연속 \n만 허용)
+            .replace(/\n{3,}/g, '\n\n')
+            // 시작과 끝의 공백 제거
+            .trim();
+
+        console.log('🔍 [마크다운 전처리]', {
+            원본길이: text.length,
+            처리후길이: processed.length,
+            원본샘플: text.substring(0, 200),
+            처리후샘플: processed.substring(0, 200)
+        });
+
+        return processed;
+    }, []);
+
     // 마크다운 파싱을 메모이제이션
     const parsedContent = useMemo(() => {
         if (summaryState.status === 'streaming' || summaryState.status === 'completed') {
-            return parseMarkdown(summaryState.content, {
+            // 전처리된 텍스트로 마크다운 파싱
+            const preprocessedText = preprocessMarkdown(summaryState.content);
+
+            return parseMarkdown(preprocessedText, {
                 inlineCodeClassName: styles.inlineCode,
                 textSpanClassName: styles.textSpan,
                 codeBlockClassName: styles.codeBlock,
@@ -125,7 +151,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
             });
         }
         return null;
-    }, [summaryState, handleConceptClick]);
+    }, [summaryState, handleConceptClick, preprocessMarkdown]);
 
     // 블로그 데이터 로딩 중이거나 에러인 경우
     if (blogState.status === 'loading') {

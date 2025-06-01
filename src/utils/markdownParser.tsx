@@ -34,6 +34,15 @@ export const MARKDOWN_STYLE_PRESETS = {
         textSpanClassName: 'comment-text-span',
         boldClassName: 'comment-bold',
         italicClassName: 'comment-italic',
+    },
+    summary: {
+        inlineCodeClassName: 'summary-inline-code',
+        textSpanClassName: 'summary-text-span',
+        codeBlockClassName: 'summary-code-block',
+        blockquoteClassName: 'summary-blockquote',
+        boldClassName: 'summary-bold',
+        italicClassName: 'summary-italic',
+        conceptKeywordClassName: 'summary-concept-keyword',
     }
 } as const;
 

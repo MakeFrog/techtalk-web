@@ -1,17 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { parseMarkdown } from '@/utils/markdownParser';
-import { SUMMARY_DATA, SummaryItemEntity, generateAnchorId } from '../../types/summaryItemEntity';
-import { MOCK_BLOG_DATA, ProgrammingConcept } from '../../types/mockData';
 import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
+import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
+import { useToc } from '@/domains/blog/hooks/useToc';
+import { useKeywords } from '@/domains/blog/hooks/useKeywords';
+import { useSummaryStream, SummaryStreamState } from '@/domains/blog/hooks/useSummaryStream';
+import { ProgrammingKeyword } from '../../types/keywordTypes';
 import * as styles from './SummaryListView.css';
-
-interface SummaryListItemProps {
-    content: string;
-    concepts: ProgrammingConcept[];
-    onConceptClick: (keyword: string, event: React.MouseEvent) => void;
-}
 
 interface PopupState {
     isVisible: boolean;
@@ -20,65 +17,12 @@ interface PopupState {
     position: { x: number; y: number };
 }
 
-// 인용문으로 시작하는지 확인하는 유틸 함수
-const isBlockquoteContent = (content: string): boolean => {
-    return content.trim().startsWith('>');
-};
-
-// 개별 리스트 아이템 컴포넌트 - 메모이제이션으로 최적화
-const SummaryListItem = React.memo(({ content, concepts, onConceptClick }: SummaryListItemProps) => {
-    const isQuote = isBlockquoteContent(content);
-
-    return (
-        <li className={isQuote ? styles.listItemNoBullet : styles.listItem}>
-            {parseMarkdown(content, {
-                inlineCodeClassName: styles.inlineCode,
-                textSpanClassName: styles.textSpan,
-                codeBlockClassName: styles.codeBlock,
-                blockquoteClassName: styles.blockquote,
-                boldClassName: styles.bold,
-                italicClassName: styles.italic,
-                conceptKeywordClassName: styles.conceptKeyword,
-                onConceptClick,
-            })}
-        </li>
-    );
-});
-
-SummaryListItem.displayName = 'SummaryListItem';
-
-// 개별 섹션 컴포넌트 - 메모이제이션으로 최적화
-const SummaryItemComponent = React.memo(({
-    item,
-    concepts,
-    onConceptClick
-}: {
-    item: SummaryItemEntity;
-    concepts: ProgrammingConcept[];
-    onConceptClick: (keyword: string, event: React.MouseEvent) => void;
-}) => {
-    return (
-        <section id={generateAnchorId(item.title, item.id)} className={styles.sectionContent}>
-            <h2 className={styles.sectionTitle}>
-                {item.id}. {item.title}
-            </h2>
-            <ul className={styles.bulletList}>
-                {item.content.map((paragraph, idx) => (
-                    <SummaryListItem
-                        key={idx}
-                        content={paragraph}
-                        concepts={concepts}
-                        onConceptClick={onConceptClick}
-                    />
-                ))}
-            </ul>
-        </section>
-    );
-});
-
-SummaryItemComponent.displayName = 'SummaryItem';
-
 const SummaryListViewComponent = () => {
+    const { state: blogState } = useBlogBasicInfo();
+    const { tocItems, generateToc } = useToc();
+    const { keywords, extractKeywords } = useKeywords();
+    const { state: summaryState, startStreaming, reset } = useSummaryStream();
+
     const [popupState, setPopupState] = useState<PopupState>({
         isVisible: false,
         keyword: '',
@@ -86,13 +30,56 @@ const SummaryListViewComponent = () => {
         position: { x: 0, y: 0 }
     });
 
+    const [isDataReady, setIsDataReady] = useState(false);
+    const [hasStartedSummary, setHasStartedSummary] = useState(false);
+
+    // 블로그 데이터가 로드되면 TOC 생성
+    useEffect(() => {
+        if (blogState.status === 'success' && tocItems.length === 0) {
+            generateToc(blogState.data.title, blogState.data.content);
+        }
+    }, [blogState, tocItems.length, generateToc]);
+
+    // 블로그 데이터가 로드되면 키워드 추출
+    useEffect(() => {
+        if (blogState.status === 'success' && keywords.length === 0) {
+            extractKeywords(blogState.data.title, blogState.data.content);
+        }
+    }, [blogState, keywords.length, extractKeywords]);
+
+    // TOC와 키워드가 모두 준비되었는지 확인
+    useEffect(() => {
+        if (tocItems.length > 0 && keywords.length > 0 && !isDataReady) {
+            setIsDataReady(true);
+        }
+    }, [tocItems.length, keywords.length, isDataReady]);
+
+    // 데이터가 준비되면 자동으로 전체 요약 생성 시작
+    useEffect(() => {
+        if (isDataReady && blogState.status === 'success' && !hasStartedSummary) {
+            setHasStartedSummary(true);
+            handleGenerateFullSummary();
+        }
+    }, [isDataReady, blogState.status, hasStartedSummary]);
+
+    const handleGenerateFullSummary = async () => {
+        if (blogState.status !== 'success') return;
+
+        reset(); // 이전 스트림 상태 초기화
+
+        await startStreaming({
+            title: blogState.data.title,
+            text: blogState.data.content,
+            toc: tocItems,
+            keywords
+        });
+    };
+
     const handleConceptClick = (keyword: string, event: React.MouseEvent) => {
         event.preventDefault();
 
-        // 해당 키워드의 설명 찾기
-        const concept = MOCK_BLOG_DATA.programming_concepts.find(
-            concept => concept.keyword === keyword
-        );
+        // 키워드 목록에서 해당 키워드의 설명 찾기
+        const concept = keywords.find(k => k.keyword === keyword);
 
         if (concept) {
             setPopupState({
@@ -111,18 +98,84 @@ const SummaryListViewComponent = () => {
         setPopupState(prev => ({ ...prev, isVisible: false }));
     };
 
+    // 마크다운 파싱을 메모이제이션
+    const parsedContent = useMemo(() => {
+        if (summaryState.status === 'streaming' || summaryState.status === 'completed') {
+            return parseMarkdown(summaryState.content, {
+                inlineCodeClassName: styles.inlineCode,
+                textSpanClassName: styles.textSpan,
+                codeBlockClassName: styles.codeBlock,
+                blockquoteClassName: styles.blockquote,
+                boldClassName: styles.bold,
+                italicClassName: styles.italic,
+                conceptKeywordClassName: styles.conceptKeyword,
+                onConceptClick: handleConceptClick,
+            });
+        }
+        return null;
+    }, [summaryState]);
+
+    // 블로그 데이터 로딩 중이거나 에러인 경우
+    if (blogState.status === 'loading') {
+        return <div></div>; // 백그라운드 로딩, UI에 표시하지 않음
+    }
+
+    if (blogState.status === 'error') {
+        return (
+            <div className={styles.container}>
+                <div className={styles.errorContainer}>
+                    <span className={styles.errorText}>⚠️ 블로그 데이터를 불러오는데 실패했습니다.</span>
+                </div>
+            </div>
+        );
+    }
+
+    // 데이터 준비 중이면 빈 화면
+    if (!isDataReady) {
+        return <div></div>;
+    }
+
+    // 요약 상태에 따른 렌더링
+    const renderContent = () => {
+        switch (summaryState.status) {
+            case 'idle':
+            case 'loading':
+                return (
+                    <div className={styles.loadingContainer}>
+                        <div className={styles.loadingSpinner}></div>
+                        <span>전체 요약을 생성하고 있습니다...</span>
+                    </div>
+                );
+
+            case 'streaming':
+            case 'completed':
+                return (
+                    <div className={styles.container}>
+                        {parsedContent}
+                    </div>
+                );
+
+            case 'error':
+                return (
+                    <div className={styles.errorContainer}>
+                        <span className={styles.errorText}>⚠️ {summaryState.message}</span>
+                        <button
+                            className={styles.retryButton}
+                            onClick={handleGenerateFullSummary}
+                        >
+                            다시 시도
+                        </button>
+                    </div>
+                );
+
+            default:
+                return null;
+        }
+    };
+
     return (
         <>
-            <div className={styles.container}>
-                {SUMMARY_DATA.map((item) => (
-                    <SummaryItemComponent
-                        key={item.id}
-                        item={item}
-                        concepts={MOCK_BLOG_DATA.programming_concepts}
-                        onConceptClick={handleConceptClick}
-                    />
-                ))}
-            </div>
+            {renderContent()}
 
             {/* 팝업 */}
             {popupState.isVisible && (

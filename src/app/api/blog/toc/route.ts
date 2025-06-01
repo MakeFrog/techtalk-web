@@ -5,12 +5,29 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(request: NextRequest) {
     try {
+        console.log('🔍 [TOC API] 요청 시작');
+
         const { title, text } = await request.json();
+        console.log('📥 [TOC API] 요청 데이터:', {
+            titleLength: title?.length,
+            textLength: text?.length
+        });
 
         if (!title || !text) {
+            console.log('❌ [TOC API] 필수 데이터 누락');
             return NextResponse.json(
                 { error: '제목과 본문이 필요합니다.' },
                 { status: 400 }
+            );
+        }
+
+        console.log('🔑 [TOC API] API 키 확인:', !!process.env.GEMINI_API_KEY);
+
+        if (!process.env.GEMINI_API_KEY) {
+            console.error('❌ [TOC API] GEMINI_API_KEY 환경변수 없음');
+            return NextResponse.json(
+                { error: 'API 키가 설정되지 않았습니다.' },
+                { status: 500 }
             );
         }
 
@@ -63,21 +80,33 @@ ${text}
 - \`\`\`json과 \`\`\` 사이에 JSON만 포함되어야 합니다.
 `;
 
+        console.log('🚀 [TOC API] Gemini 호출 시작');
         const result = await model.generateContent(tocPrompt);
+        console.log('✅ [TOC API] Gemini 응답 받음');
+
         const response = await result.response;
         const responseText = response.text();
+        console.log('📝 [TOC API] 응답 텍스트 길이:', responseText.length);
 
         // JSON 추출 (```json과 ``` 사이의 내용)
         const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
         if (!jsonMatch) {
+            console.error('❌ [TOC API] JSON 파싱 실패, 응답:', responseText.substring(0, 200));
             throw new Error('유효한 JSON 응답을 받지 못했습니다.');
         }
 
+        console.log('🎯 [TOC API] JSON 추출 성공');
         const tocData = JSON.parse(jsonMatch[1]);
+        console.log('✅ [TOC API] 성공 완료, 목차 수:', tocData.toc?.length);
 
         return NextResponse.json(tocData);
     } catch (error) {
-        console.error('TOC 생성 중 오류:', error);
+        console.error('❌ [TOC API] 전체 오류:', error);
+        console.error('❌ [TOC API] 오류 상세:', {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        });
         return NextResponse.json(
             { error: '목차 생성 중 오류가 발생했습니다.' },
             { status: 500 }

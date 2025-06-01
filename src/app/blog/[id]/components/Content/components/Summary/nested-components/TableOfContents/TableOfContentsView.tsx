@@ -23,23 +23,17 @@ const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
         e.preventDefault();
 
         const targetElement = document.getElementById(anchorId);
+
         if (targetElement) {
-            // 상단에 여백을 주기 위해 offsetTop을 계산하여 수동으로 스크롤
-            const container = targetElement.closest('[class*="contentSection"]') as HTMLElement;
-            if (container) {
-                const offsetTop = targetElement.offsetTop - 24; // 24px 여백
-                container.scrollTo({
-                    top: offsetTop,
-                    behavior: 'smooth'
-                });
-            } else {
-                // fallback: 기본 scrollIntoView 사용
-                targetElement.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start',
-                    inline: 'nearest'
-                });
-            }
+            targetElement.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+                inline: 'nearest'
+            });
+
+
+        } else {
+            console.warn(`⚠️ [TOC] 앵커 요소를 찾을 수 없습니다: ${anchorId}`);
         }
     };
 

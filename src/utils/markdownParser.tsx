@@ -138,6 +138,7 @@ const parseInlineElements = (
     // 줄 단위로 분리하여 각종 블록 요소 처리
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
+    let headingCounter = 1; // 제목 순서 카운터
 
     lines.forEach((line, lineIndex) => {
         const trimmedLine = line.trim();
@@ -148,10 +149,23 @@ const parseInlineElements = (
             const [, hashes, titleText] = headingMatch;
             const level = hashes.length;
             const HeadingTag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+            const anchorId = `section-${headingCounter}`; // TOC와 매칭되는 ID 생성
+
+            // 제목에 숫자가 없으면 자동으로 추가 (예: "제목" -> "1. 제목")
+            const hasNumberPrefix = /^\d+\.\s/.test(titleText);
+            const formattedTitle = hasNumberPrefix ? titleText : `${headingCounter}. ${titleText}`;
+
+            console.log(`🔍 [마크다운 파서] 제목 처리:`, {
+                원본: titleText,
+                포맷된제목: formattedTitle,
+                앵커ID: anchorId,
+                레벨: level
+            });
 
             elements.push(
                 React.createElement(HeadingTag, {
                     key: `heading-${baseKey}-${lineIndex}`,
+                    id: anchorId, // 앵커 ID 추가
                     style: {
                         fontSize: level === 1 ? '1.8rem' : level === 2 ? '1.5rem' : level === 3 ? '1.3rem' : '1.1rem',
                         fontWeight: 'bold',
@@ -159,7 +173,7 @@ const parseInlineElements = (
                         lineHeight: '1.4',
                         color: '#1a1a1a'
                     }
-                }, parseTextFormatting(titleText, {
+                }, parseTextFormatting(formattedTitle, {
                     inlineCodeClassName,
                     textSpanClassName,
                     boldClassName,
@@ -168,6 +182,8 @@ const parseInlineElements = (
                     onConceptClick
                 }, `${baseKey}-heading-${lineIndex}`))
             );
+
+            headingCounter++; // 제목 카운터 증가
         }
         // 리스트 아이템 처리 (- 또는 * 로 시작)
         else if (trimmedLine.match(/^[-*]\s+/)) {

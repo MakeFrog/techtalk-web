@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 - 각 목차는은 '🏷️ 제목' 형식으로 반환한다.(이모지) (제목) 
   - 🏷️은 글 맥락에 맞는 단일 이모지(🎯🖱️⚙️📱 등)  
 
-
+  
 ### 출력 형식
 아래 JSON 형식 그대로, 설명이나 주석 없이 **JSON만** 반환해주세요.
 \`\`\`json

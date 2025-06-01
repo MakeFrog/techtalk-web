@@ -110,10 +110,10 @@ export default function Content() {
     return (
         <section className={container}>
             <ContentHeader />
-            {/* <Gap size={24} />
+            <Gap size={24} />
             <InsightSectionView streamState={insightState} />
             <Gap size={20} />
-            <QuestionSectionView /> */}
+            <QuestionSectionView />
             <Gap size={24} />
             <SummarySectionView />
         </section>

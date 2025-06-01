@@ -3,6 +3,7 @@ import OriginBlog from "./components/OriginBlog/OriginBlog";
 import NotFound from "./components/NotFound/NotFound";
 import { BlogDataProvider } from "@/domains/blog/providers/BlogDataProvider";
 import { BlogBasicInfoProvider } from "@/domains/blog/providers/BlogBasicInfoProvider";
+import { AnalyzedInfoProvider } from "@/domains/blog/providers/AnalyzedInfoProvider";
 import { checkDocumentExists } from "@/domains/blog/services/blogDataService";
 import { container, contentSection, originBlogSection } from "./page.css";
 
@@ -35,15 +36,17 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
     return (
         <BlogDataProvider documentId={documentId} documentExists={true}>
             <BlogBasicInfoProvider documentId={documentId}>
-                <div className={container}>
-                    <div className={contentSection}>
-                        <Content />
-                    </div>
+                <AnalyzedInfoProvider>
+                    <div className={container}>
+                        <div className={contentSection}>
+                            <Content />
+                        </div>
 
-                    <div className={originBlogSection}>
-                        <OriginBlog />
+                        <div className={originBlogSection}>
+                            <OriginBlog />
+                        </div>
                     </div>
-                </div>
+                </AnalyzedInfoProvider>
             </BlogBasicInfoProvider>
         </BlogDataProvider>
     );

@@ -8,7 +8,7 @@ import { QuestionSectionView } from "./components/Question/QuestionSectionView.t
 import { SummarySectionView } from "./components/Summary/SummarySectionView.tsx";
 import { useInsightStream } from "@/domains/blog/hooks/useInsightStream";
 import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect } from "react";
 
 export default function Content() {
     // BlogBasicInfoProvider에서 데이터와 상태 가져오기
@@ -17,52 +17,23 @@ export default function Content() {
     // 인사이트 스트림 상태
     const { state: insightState, startStreaming: startInsightStreaming } = useInsightStream();
 
-    // 스트리밍이 이미 시작되었는지 추적
-    const streamingStartedRef = useRef<boolean>(false);
+    // 블로그 데이터가 준비되면 인사이트 스트리밍 시작
+    useEffect(() => {
+        if (state.status === 'success' && insightState.status === 'idle') {
+            const { title, content } = state.data;
 
-    // 병렬 스트리밍 시작 콜백 (인사이트만 여기서 시작, 질문은 QuestionSectionView에서 자체 처리)
-    const handleStartParallelStreaming = useCallback(() => {
-        // 데이터가 준비되고 스트리밍이 아직 시작되지 않았을 때만 실행
-        const isDataReady = (
-            state.status === 'success' &&
-            state.data.title &&
-            state.data.content.trim()
-        );
-
-        const shouldStartStreaming = (
-            isDataReady &&
-            !streamingStartedRef.current &&
-            insightState.status === 'idle'
-        );
-
-        if (shouldStartStreaming) {
-            streamingStartedRef.current = true;
-
-            const blogInput = {
-                title: state.data.title,
-                text: state.data.content
-            };
-
-            console.log('⚡ [Content] 병렬 처리: 인사이트 스트리밍 시작 (질문은 QuestionSectionView에서 병렬 처리)', {
-                title: blogInput.title,
-                textLength: blogInput.text.length,
+            console.log('⚡ [Content] 인사이트 스트리밍 시작:', {
+                title: title.substring(0, 50) + '...',
+                contentLength: content.length,
                 insightState: insightState.status
             });
 
-            // 인사이트 스트리밍 시작 (질문은 QuestionSectionView에서 병렬로 처리됨)
-            startInsightStreaming(blogInput);
+            startInsightStreaming({
+                title: title,
+                text: content
+            });
         }
     }, [state, insightState.status, startInsightStreaming]);
-
-    // 블로그 데이터가 준비되면 병렬 스트리밍 시작
-    useEffect(() => {
-        handleStartParallelStreaming();
-    }, [handleStartParallelStreaming]);
-
-    // 데이터가 변경되면 스트리밍 상태 리셋
-    useEffect(() => {
-        streamingStartedRef.current = false;
-    }, [state]);
 
     // 로딩 상태 표시
     if (state.status === 'loading') {

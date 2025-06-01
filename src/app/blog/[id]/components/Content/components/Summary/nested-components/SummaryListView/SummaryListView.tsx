@@ -5,9 +5,7 @@ import { parseMarkdown } from '@/utils/markdownParser';
 import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
 import { LoadingSpinner } from '@/components/loading/LoadingSpinner/LoadingSpinner';
 import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
-import { useToc } from '@/domains/blog/hooks/useToc';
-import { useKeywords } from '@/domains/blog/hooks/useKeywords';
-import { useSummaryStream } from '@/domains/blog/hooks/useSummaryStream';
+import { useAnalyzedInfo } from '@/domains/blog/providers/AnalyzedInfoProvider';
 import { TocItem } from '../../types/tocTypes';
 import * as styles from './SummaryListView.css';
 
@@ -24,9 +22,7 @@ interface SummaryListViewProps {
 
 const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }) => {
     const { state: blogState } = useBlogBasicInfo();
-    const { tocItems, generateToc } = useToc();
-    const { keywords, extractKeywords } = useKeywords();
-    const { state: summaryState, startStreaming, reset } = useSummaryStream();
+    const { state: analyzedState } = useAnalyzedInfo();
 
     const [popupState, setPopupState] = useState<PopupState>({
         isVisible: false,
@@ -35,54 +31,14 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         position: { x: 0, y: 0 }
     });
 
-    const [isDataReady, setIsDataReady] = useState(false);
-    const [hasStartedSummary, setHasStartedSummary] = useState(false);
-
-    // 전체 요약 생성 함수
-    const handleGenerateFullSummary = useCallback(async () => {
-        console.log('🚨🚨🚨 [SummaryListView] ===== 요약 생성 시작 =====');
-
-        if (blogState.status !== 'success') {
-            console.log('❌ [SummaryListView] 블로그 상태가 success가 아님:', blogState.status);
-            return;
-        }
-
-        console.log('✅ [SummaryListView] 요약 생성 조건 확인 완료');
-        console.log('📋 [SummaryListView] 전송할 데이터:', {
-            title: blogState.data.title,
-            textLength: blogState.data.content.length,
-            tocLength: tocItems.length,
-            keywordsLength: keywords.length
-        });
-
-        // 키워드 상세 내용 출력
-        console.log('🔑 [SummaryListView] 키워드 상세 내용:');
-        keywords.forEach((keyword, index) => {
-            console.log(`   ${index + 1}. [${keyword.keyword}]: ${keyword.description}`);
-        });
-
-        // TOC 상세 내용 출력  
-        console.log('📋 [SummaryListView] TOC 상세 내용:');
-        tocItems.forEach((item, index) => {
-            console.log(`   ${index + 1}. ${item.title}`);
-        });
-
-        reset(); // 이전 스트림 상태 초기화
-
-        await startStreaming({
-            title: blogState.data.title,
-            text: blogState.data.content,
-            toc: tocItems,
-            keywords
-        });
-    }, [blogState, reset, startStreaming, tocItems, keywords]);
-
-    // 블로그 데이터가 로드되면 TOC 생성
-    useEffect(() => {
-        if (blogState.status === 'success' && tocItems.length === 0) {
-            generateToc(blogState.data.title, blogState.data.content);
-        }
-    }, [blogState, tocItems.length, generateToc]);
+    // TOC 데이터 변환 (string[] -> TocItem[])
+    const tocItems = useMemo(() => {
+        if (!analyzedState.toc) return [];
+        return analyzedState.toc.map((title, index) => ({
+            id: index,
+            title
+        }));
+    }, [analyzedState.toc]);
 
     // TOC가 생성되면 상위 컴포넌트에 전달
     useEffect(() => {
@@ -91,33 +47,11 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         }
     }, [tocItems, onTocReady]);
 
-    // 블로그 데이터가 로드되면 키워드 추출
-    useEffect(() => {
-        if (blogState.status === 'success' && keywords.length === 0) {
-            extractKeywords(blogState.data.title, blogState.data.content);
-        }
-    }, [blogState, keywords.length, extractKeywords]);
-
-    // TOC와 키워드가 모두 준비되었는지 확인
-    useEffect(() => {
-        if (tocItems.length > 0 && keywords.length > 0 && !isDataReady) {
-            setIsDataReady(true);
-        }
-    }, [tocItems.length, keywords.length, isDataReady]);
-
-    // 데이터가 준비되면 자동으로 전체 요약 생성 시작
-    useEffect(() => {
-        if (isDataReady && blogState.status === 'success' && !hasStartedSummary) {
-            setHasStartedSummary(true);
-            handleGenerateFullSummary();
-        }
-    }, [isDataReady, blogState.status, hasStartedSummary, handleGenerateFullSummary]);
-
     const handleConceptClick = useCallback((keyword: string, event: React.MouseEvent) => {
         event.preventDefault();
 
         // 키워드 목록에서 해당 키워드의 설명 찾기
-        const concept = keywords.find(k => k.keyword === keyword);
+        const concept = analyzedState.programming_keywords?.find(k => k.keyword === keyword);
 
         if (concept) {
             setPopupState({
@@ -130,7 +64,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
                 }
             });
         }
-    }, [keywords]);
+    }, [analyzedState.programming_keywords]);
 
     const handleClosePopup = useCallback(() => {
         setPopupState(prev => ({ ...prev, isVisible: false }));
@@ -156,12 +90,14 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
 
     // 마크다운 파싱을 메모이제이션
     const parsedContent = useMemo(() => {
-        if (summaryState.status === 'streaming' || summaryState.status === 'completed') {
+        // 스트리밍 중이거나 완료된 상태에서 summary가 있으면 파싱
+        if (analyzedState.summary &&
+            (analyzedState.fieldStatus.summary === 'loading' || analyzedState.fieldStatus.summary === 'completed')) {
             // 전처리된 텍스트로 마크다운 파싱
-            const preprocessedText = preprocessMarkdown(summaryState.content);
+            const preprocessedText = preprocessMarkdown(analyzedState.summary);
 
             // 유효한 키워드 목록 생성 (실제 전달받은 키워드만)
-            const validKeywords = keywords.map(keyword => keyword.keyword);
+            const validKeywords = analyzedState.programming_keywords?.map(keyword => keyword.keyword) || [];
 
             return parseMarkdown(preprocessedText, {
                 inlineCodeClassName: styles.inlineCode,
@@ -176,7 +112,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
             });
         }
         return null;
-    }, [summaryState, handleConceptClick, preprocessMarkdown, keywords]);
+    }, [analyzedState.summary, analyzedState.fieldStatus.summary, analyzedState.programming_keywords, handleConceptClick, preprocessMarkdown]);
 
     // 블로그 데이터 로딩 중이거나 에러인 경우
     if (blogState.status === 'loading') {
@@ -198,19 +134,17 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         return <div></div>;
     }
 
-    // 목차는 생성되었지만 요약 스트리밍이 아직 시작되지 않은 경우 로딩 스피너 표시
-    if (summaryState.status === 'idle' || summaryState.status === 'loading') {
+    // 요약이 아직 시작되지 않은 경우에만 로딩 스피너 표시
+    if (analyzedState.fieldStatus.summary === 'pending') {
         return (
             <>
                 <div className={styles.container}>
                     <LoadingSpinner
                         size="medium"
                         layout="center"
-                        message="전체 요약을 생성하고 있습니다..."
+                        message="요약을 생성하고 있습니다..."
                     />
                 </div>
-
-                {/* 팝업 */}
                 {popupState.isVisible && (
                     <ConceptPopup
                         keyword={popupState.keyword}
@@ -225,9 +159,34 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
 
     // 요약 상태에 따른 렌더링
     const renderContent = () => {
-        switch (summaryState.status) {
-            case 'streaming':
+        switch (analyzedState.fieldStatus.summary) {
+            case 'loading':
+                // 스트리밍 중: 현재까지 받은 내용을 실시간으로 표시
+                return (
+                    <div className={styles.container}>
+                        {parsedContent && (
+                            <div>
+                                {parsedContent}
+                                {/* 스트리밍 중임을 나타내는 커서 표시 */}
+                                <span style={{
+                                    animation: 'blink 1s infinite',
+                                    fontSize: '1.2em',
+                                    color: '#A855F7'
+                                }}>▊</span>
+                            </div>
+                        )}
+                        {!parsedContent && (
+                            <LoadingSpinner
+                                size="medium"
+                                layout="center"
+                                message="요약을 생성하고 있습니다..."
+                            />
+                        )}
+                    </div>
+                );
+
             case 'completed':
+                // 완료: 최종 내용 표시
                 return (
                     <div className={styles.container}>
                         {parsedContent}
@@ -237,13 +196,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
             case 'error':
                 return (
                     <div className={styles.errorContainer}>
-                        <span className={styles.errorText}>⚠️ {summaryState.message}</span>
-                        <button
-                            className={styles.retryButton}
-                            onClick={handleGenerateFullSummary}
-                        >
-                            다시 시도
-                        </button>
+                        <span className={styles.errorText}>⚠️ 요약 생성 중 오류가 발생했습니다.</span>
                     </div>
                 );
 

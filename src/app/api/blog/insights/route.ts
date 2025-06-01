@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/analyzedInfoService';
+import { generateInsightStream } from '@/domains/blog/services/geminiService';
+
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -31,106 +34,112 @@ async function retryWithBackoff<T>(
     throw new Error('최대 재시도 횟수 초과');
 }
 
-export async function POST(request: NextRequest) {
-    try {
-        console.log('🚀 [Gemini Insights API] 요청 시작');
+interface InsightRequest {
+    title: string;
+    text: string;
+    documentId?: string; // API 레이어에서 자동 저장을 위한 documentId
+}
 
-        const { title, text } = await request.json();
-        console.log('📋 [Gemini Insights API] 요청 데이터:', {
+/**
+ * 블로그 인사이트 생성 및 스트리밍 API
+ * 
+ * 가이드라인 준수:
+ * - 단일 책임: 인사이트 생성과 스트리밍만 담당
+ * - 예측 가능성: POST 요청으로 인사이트 생성 동작 명확
+ * - 숨겨진 로직 없음: documentId가 있으면 저장, 명시적으로 표현
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+    try {
+        const { title, text, documentId }: InsightRequest = await request.json();
+
+        console.log('📊 [Insights API] 요청 받음:', {
             title: title?.substring(0, 50) + '...',
-            textLength: text?.length || 0
+            textLength: text?.length,
+            hasDocumentId: !!documentId
         });
 
+        // 입력 검증
         if (!title || !text) {
-            console.error('❌ [Gemini Insights API] 제목 또는 내용이 없습니다.');
+            console.error('❌ [Insights API] 입력 데이터 누락');
             return NextResponse.json(
-                { error: '제목과 내용이 필요합니다.' },
+                { error: 'title과 text는 필수입니다.' },
                 { status: 400 }
             );
         }
 
-        // Gemini Flash 2.0 모델 설정
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
-            generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 528,
+        // documentId가 있으면 기존 데이터 확인
+        if (documentId) {
+            console.log('🔍 [Insights API] 기존 인사이트 확인 중:', documentId);
+
+            const existsResult = await checkFieldExists(documentId, 'insight');
+            if (existsResult.exists) {
+                console.log('✅ [Insights API] 기존 인사이트 발견, 저장된 데이터 반환');
+
+                return NextResponse.json(
+                    {
+                        message: '기존 저장된 인사이트를 사용합니다.',
+                        useExisting: true,
+                        data: existsResult.data // 실제 저장된 데이터 포함
+                    },
+                    { status: 200 }
+                );
             }
-        });
+            console.log('📭 [Insights API] 기존 인사이트 없음, 새로 생성');
+        }
 
-        // 한국어로 인사이트 생성 프롬프트
-        const prompt = `
-당신은 기슬 블로그 글을 소개하는 편집자 입니다.
-아래 기술 블로그의 '제목'과 '원문'을 바탕으로, 글에서 얻을 수 있는 핵심 인사이트를 간결하게 요약하여,
-이 글을 독자가 읽어야 하는 이유를 설명해 주세요.
-
-## 작성 기준 
-- 글의 '문제 정의'나 '기술적 고민'이 잘 드러난 부분이 있다면 꼭 언급해주세요.
-- 기술적으로 흥미로운 내용이 있으면 설명해주세요.
-- 너무 평범하거나 상투적인 요약은 피합니다.
-- 글의 마지막 문장에 이 글을 읽고 어떤 지식, 시야, 실전 노하우를 얻을 수 있는지 설명해 주세요.
-
-## 출력 형식
-- 2~3줄 내외의 간결하고 자연스러운 한국어 문장
-  - 마크다운 형식을 지원합니다
-  - 글의 맥락상 중요한 내용이거나 프로그래밍 키워드는 **볼드**로 강조하여 나타냅니다. (각 센션별로 최소 2개 이상) 
-- 형식적인 인사말이나 불필요한 도입부 없이 곧바로 요약 내용만 작성
-
-### 📥 입력 데이터
-제목: ${title}
-
-원문: ${text}
-`;
-
-        console.log('🚀 [Gemini Insights] Flash 2.0 스트리밍 시작');
-
-        // 스트리밍 응답 생성
-        const encoder = new TextEncoder();
+        // ReadableStream 생성
         const stream = new ReadableStream({
             async start(controller) {
+                let accumulatedContent = '';
+
                 try {
-                    console.log('🔄 [Gemini Insights] 스트림 처리 시작');
+                    console.log('🤖 [Insights API] Gemini 스트림 시작');
 
-                    // 재시도 로직으로 스트림 생성
-                    const result = await retryWithBackoff(
-                        () => model.generateContentStream(prompt),
-                        3, // 최대 3회 재시도
-                        2000 // 기본 2초 대기
-                    );
+                    // Gemini 서비스에서 스트림 생성 및 처리
+                    for await (const chunk of generateInsightStream(title, text)) {
+                        accumulatedContent += chunk;
 
-                    // 스트림 처리
-                    for await (const chunk of result.stream) {
-                        const chunkText = chunk.text();
-                        if (chunkText) {
-                            console.log('📨 [Gemini Insights] 청크 수신:', {
-                                chunkLength: chunkText.length
-                            });
-                            controller.enqueue(encoder.encode(chunkText));
+                        // 클라이언트로 청크 전송
+                        const encoder = new TextEncoder();
+                        controller.enqueue(encoder.encode(chunk));
+
+                        console.log('📨 [Insights API] 청크 전송:', {
+                            chunkLength: chunk.length,
+                            totalLength: accumulatedContent.length
+                        });
+                    }
+
+                    console.log('✅ [Insights API] 스트림 완료');
+
+                    // documentId가 있으면 Firestore에 저장
+                    if (documentId && accumulatedContent.trim()) {
+                        console.log('💾 [Insights API] Firestore 저장 시작:', documentId);
+
+                        const saveResult = await updateAnalyzedInfo(documentId, {
+                            insight: accumulatedContent.trim()
+                        });
+
+                        if (saveResult.success) {
+                            console.log('✅ [Insights API] Firestore 저장 성공');
+                        } else {
+                            console.error('❌ [Insights API] Firestore 저장 실패:', saveResult.error);
                         }
                     }
 
-                    console.log('✅ [Gemini Insights] 스트림 완료');
-                    controller.close();
-                } catch (error: any) {
-                    console.error('❌ [Gemini Insights] 스트림 오류:', error);
+                } catch (error) {
+                    console.error('❌ [Insights API] 스트림 생성 오류:', error);
 
-                    // 429 에러 특별 처리
-                    if (error?.status === 429) {
-                        const errorMessage = 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.';
-                        controller.enqueue(encoder.encode(errorMessage));
-                    } else {
-                        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-                        controller.enqueue(encoder.encode(errorMessage));
-                    }
-
+                    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+                    const encoder = new TextEncoder();
+                    controller.enqueue(encoder.encode(`\n\n오류: ${errorMessage}`));
+                } finally {
                     controller.close();
                 }
-            },
+            }
         });
 
-        return new Response(stream, {
+        // 스트리밍 응답 반환
+        return new NextResponse(stream, {
             headers: {
                 'Content-Type': 'text/plain; charset=utf-8',
                 'Cache-Control': 'no-cache',
@@ -138,26 +147,12 @@ export async function POST(request: NextRequest) {
             },
         });
 
-    } catch (error: any) {
-        console.error('❌ [Gemini Insights API] 전체 오류:', error);
-        console.error('❌ [Gemini Insights API] 오류 스택:', error instanceof Error ? error.stack : 'Unknown');
+    } catch (error) {
+        console.error('❌ [Insights API] 전체 오류:', error);
 
-        // 429 에러 특별 처리
-        if (error?.status === 429) {
-            return NextResponse.json(
-                {
-                    error: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
-                    retryAfter: '60초 후 재시도 가능'
-                },
-                { status: 429 }
-            );
-        }
-
+        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
         return NextResponse.json(
-            {
-                error: '인사이트 생성에 실패했습니다.',
-                details: error instanceof Error ? error.message : 'Unknown error'
-            },
+            { error: `서버 오류: ${errorMessage}` },
             { status: 500 }
         );
     }

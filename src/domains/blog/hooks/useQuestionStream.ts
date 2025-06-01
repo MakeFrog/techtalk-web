@@ -1,147 +1,284 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
 
 export interface Question {
     question: string;
     answer: string;
 }
 
-interface UseQuestionStreamReturn {
-    questions: Question[];
-    isLoading: boolean;
-    error: string | null;
-    generateQuestions: (title: string, content: string) => Promise<void>;
-    reset: () => void;
+// 질문 스트림 상태 타입 (Discriminated Union)
+export type QuestionStreamState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'streaming'; questions: Question[] }
+    | { status: 'completed'; questions: Question[] }
+    | { status: 'error'; message: string; questions: Question[] };
+
+interface QuestionStreamInput {
+    title: string;
+    content: string;
 }
 
-export function useQuestionStream(): UseQuestionStreamReturn {
-    const [questions, setQuestions] = useState<Question[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+/**
+ * 면접 질문 스트리밍을 관리하는 Hook
+ * 
+ * 개선사항:
+ * - 실시간 질문 수신 및 표시
+ * - 중복 질문 방지 로직
+ * - AbortController를 통한 안전한 스트림 취소
+ * - API 레이어에서의 자동 저장 (BlogBasicInfoProvider의 documentId 활용)
+ * - 초기 로드 시 기존 저장된 QnA 확인 및 로드
+ */
+export function useQuestionStream() {
+    const [state, setState] = useState<QuestionStreamState>({ status: 'idle' });
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const { documentId } = useBlogBasicInfo();
+    const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
 
-    const reset = useCallback(() => {
-        setQuestions([]);
-        setIsLoading(false);
-        setError(null);
-    }, []);
+    // 기존 QnA 데이터 확인 및 로드
+    const checkExistingQuestions = useCallback(async () => {
+        if (!documentId || hasCheckedExisting) return;
 
-    const generateQuestions = useCallback(async (title: string, content: string) => {
-        console.log('🚀 [useQuestionStream] 스트림 질문 생성 시작');
-
-        setIsLoading(true);
-        setError(null);
-        setQuestions([]);
+        console.log('🔍 [면접질문] 기존 데이터 확인 중:', documentId);
+        setHasCheckedExisting(true);
 
         try {
+            const response = await fetch(`/api/blog/analyzed-info/${documentId}`);
+            const result = await response.json();
+
+            if (result.success && result.exists && result.data?.qna && Array.isArray(result.data.qna) && result.data.qna.length > 0) {
+                console.log('✅ [면접질문] 기존 데이터 발견:', {
+                    questionsCount: result.data.qna.length
+                });
+                setState({
+                    status: 'completed',
+                    questions: result.data.qna
+                });
+            } else {
+                console.log('📭 [면접질문] 기존 데이터 없음');
+            }
+        } catch (error) {
+            console.error('❌ [면접질문] 기존 데이터 확인 실패:', error);
+        }
+    }, [documentId, hasCheckedExisting]);
+
+    // 컴포넌트 마운트 시 기존 데이터 확인
+    useEffect(() => {
+        if (documentId && !hasCheckedExisting) {
+            checkExistingQuestions();
+        }
+    }, [documentId, checkExistingQuestions, hasCheckedExisting]);
+
+    const startStreaming = useCallback(async (input: QuestionStreamInput) => {
+        // 이미 완료된 상태면 스트리밍 시작하지 않음
+        if (state.status === 'completed') {
+            console.log('✅ [면접질문] 이미 완료된 상태, 스트리밍 생략');
+            return;
+        }
+
+        console.log('🚀 [면접질문] 스트리밍 시작');
+        console.log('📋 [면접질문] 입력:', {
+            title: input.title,
+            contentLength: input.content.length,
+            documentId // BlogBasicInfoProvider에서 가져온 documentId 사용
+        });
+
+        // 이전 요청이 있으면 취소
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        // 새로운 AbortController 생성
+        abortControllerRef.current = new AbortController();
+
+        setState({ status: 'loading' });
+
+        try {
+            // documentId를 포함한 요청 데이터
+            const requestBody = {
+                ...input,
+                documentId // API에서 자동 저장을 위해 documentId 전달
+            };
+
             const response = await fetch('/api/blog/questions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ title, content }),
+                body: JSON.stringify(requestBody),
+                signal: abortControllerRef.current.signal,
             });
 
             if (!response.ok) {
-                // 429 에러 특별 처리
-                if (response.status === 429) {
-                    throw new Error('API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+                // 기존 QnA가 있는 경우 (status 200이지만 useExisting: true)
+                if (response.status === 200) {
+                    const result = await response.json();
+                    if (result.useExisting && result.data && Array.isArray(result.data)) {
+                        console.log('✅ [면접질문] 기존 저장된 QnA 사용:', {
+                            questionsCount: result.data.length
+                        });
+                        setState({
+                            status: 'completed',
+                            questions: result.data
+                        });
+                        return;
+                    }
                 }
-                throw new Error(`API 요청 실패: ${response.status}`);
+                throw new Error(`HTTP ${response.status}: 서버 응답 오류`);
+            }
+
+            // 스트리밍이 아닌 일반 JSON 응답 처리 (useExisting 케이스)
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const result = await response.json();
+                if (result.useExisting && result.data && Array.isArray(result.data)) {
+                    console.log('✅ [면접질문] 기존 저장된 QnA 사용:', {
+                        questionsCount: result.data.length
+                    });
+                    setState({
+                        status: 'completed',
+                        questions: result.data
+                    });
+                    return;
+                }
             }
 
             if (!response.body) {
-                throw new Error('응답 본문이 없습니다');
+                throw new Error('응답 스트림을 받을 수 없습니다.');
             }
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let buffer = '';
-            let questionCount = 0;
-            const processedQuestions = new Set<string>(); // 중복 방지
+            const questions: Question[] = [];
+            const receivedQuestions = new Set<string>(); // 중복 방지
 
-            console.log('🔄 [useQuestionStream] 스트림 처리 시작');
+            console.log('📡 [면접질문] 스트림 읽기 시작');
+            setState({ status: 'streaming', questions: [] });
 
-            while (true) {
-                const { done, value } = await reader.read();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
 
-                if (done) {
-                    console.log('✅ [useQuestionStream] 스트림 완료');
-                    break;
-                }
+                    if (done) {
+                        console.log('✅ [면접질문] 스트림 완료 (API에서 자동 저장됨)');
+                        setState({ status: 'completed', questions });
+                        break;
+                    }
 
-                buffer += decoder.decode(value, { stream: true });
-                console.log('📨 [useQuestionStream] 스트림 데이터 수신:', { bufferLength: buffer.length });
+                    const chunk = decoder.decode(value, { stream: true });
 
-                // SSE 형식으로 파싱
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || ''; // 마지막 불완전한 줄은 버퍼에 유지
+                    // SSE 형식 파싱 (data: {...})
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonData = line.slice(6); // 'data: ' 제거
+                                const parsedData = JSON.parse(jsonData);
 
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const dataStr = line.slice(6); // 'data: ' 제거
+                                // 에러 처리
+                                if (parsedData.error) {
+                                    console.error('❌ [면접질문] 서버 에러:', parsedData.error);
+                                    setState({
+                                        status: 'error',
+                                        message: parsedData.error,
+                                        questions
+                                    });
+                                    return;
+                                }
 
-                        if (dataStr === '[DONE]') {
-                            console.log('🏁 [useQuestionStream] 스트림 종료 신호 수신');
-                            break;
-                        }
+                                // 질문 데이터 처리
+                                if (parsedData.question && parsedData.answer) {
+                                    const questionKey = `${parsedData.question}_${parsedData.answer}`;
 
-                        try {
-                            const data = JSON.parse(dataStr);
+                                    // 중복 질문 제거
+                                    if (!receivedQuestions.has(questionKey)) {
+                                        receivedQuestions.add(questionKey);
+                                        questions.push({
+                                            question: parsedData.question,
+                                            answer: parsedData.answer
+                                        });
 
-                            // 에러 처리
-                            if (data.error) {
-                                console.error('❌ [useQuestionStream] 서버 에러:', data.error);
-                                setError(data.error);
-                                break;
+                                        console.log(`📨 [면접질문] 새 질문 수신 (${questions.length}번째):`, {
+                                            question: parsedData.question.substring(0, 50) + '...',
+                                            answer: parsedData.answer.substring(0, 30) + '...'
+                                        });
+
+                                        // 실시간 상태 업데이트
+                                        setState({ status: 'streaming', questions: [...questions] });
+                                    } else {
+                                        console.log('⏭️ [면접질문] 중복 질문 건너뛰기');
+                                    }
+                                }
+                            } catch (parseError) {
+                                console.warn('⚠️ [면접질문] JSON 파싱 실패:', line);
                             }
-
-                            // 중복 질문 방지
-                            const questionKey = `${data.question}_${data.answer}`;
-                            if (!processedQuestions.has(questionKey)) {
-                                processedQuestions.add(questionKey);
-                                questionCount++;
-
-                                console.log(`✨ [useQuestionStream] ${questionCount}번째 질문 수신:`, {
-                                    question: data.question?.substring(0, 50) + '...',
-                                    answer: data.answer?.substring(0, 30) + '...'
-                                });
-
-                                setQuestions(prev => [...prev, data]);
-                            } else {
-                                console.log('⏭️ [useQuestionStream] 중복 질문 건너뛰기');
-                            }
-                        } catch (parseError) {
-                            console.warn('⚠️ [useQuestionStream] JSON 파싱 실패:', {
-                                data: dataStr.substring(0, 100),
-                                error: parseError
-                            });
                         }
                     }
                 }
+            } catch (streamError) {
+                if (streamError instanceof Error && streamError.name === 'AbortError') {
+                    console.log('🛑 [면접질문] 스트림 취소됨');
+                    setState({ status: 'idle' });
+                } else {
+                    console.error('❌ [면접질문] 스트림 읽기 오류:', streamError);
+                    setState({
+                        status: 'error',
+                        message: '스트림 읽기에 실패했습니다.',
+                        questions
+                    });
+                }
+            } finally {
+                reader.releaseLock();
             }
 
-            console.log(`🎯 [useQuestionStream] 총 ${questionCount}개 질문 처리 완료`);
-
-        } catch (error: any) {
-            console.error('❌ [useQuestionStream] 스트림 오류:', error);
-
-            // 429 에러에 대한 사용자 친화적 메시지
-            if (error.message.includes('API 요청 한도')) {
-                setError('🚫 API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
-            } else if (error.message.includes('429')) {
-                setError('🚫 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
+        } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.log('🛑 [면접질문] 요청 취소됨');
+                setState({ status: 'idle' });
             } else {
-                setError(error instanceof Error ? error.message : '질문 생성에 실패했습니다.');
+                console.error('❌ [면접질문] 요청 오류:', error);
+                setState({
+                    status: 'error',
+                    message: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+                    questions: []
+                });
             }
-        } finally {
-            setIsLoading(false);
         }
+    }, [documentId, state.status, checkExistingQuestions]);
+
+    const stopStreaming = useCallback(() => {
+        console.log('🛑 [면접질문] 스트리밍 중단');
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
+        setState(prev => ({ ...prev, status: 'idle' }));
+    }, []);
+
+    const reset = useCallback(() => {
+        console.log('🔄 [면접질문] Hook 리셋');
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
+        setState({ status: 'idle' });
+        setHasCheckedExisting(false);
     }, []);
 
     return {
-        questions,
-        isLoading,
-        error,
-        generateQuestions,
-        reset
+        state,
+        startStreaming,
+        stopStreaming,
+        reset,
+        // 디버깅용 상태 노출
+        debug: {
+            hasActiveRequest: !!abortControllerRef.current,
+            documentId,
+            hasCheckedExisting
+        }
     };
 } 

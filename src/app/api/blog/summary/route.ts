@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/analyzedInfoService';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     console.log('🚨🚨🚨 [Summary API] ===== API 호출 시작 =====');
 
     try {
-        const { title, text, toc, keywords } = await request.json();
+        const { title, text, toc, keywords, documentId } = await request.json();
 
         console.log('✅ [Summary API] JSON 파싱 완료');
 
@@ -44,8 +45,29 @@ export async function POST(request: NextRequest) {
             textLength: text?.length,
             tocLength: toc?.length,
             keywordsLength: keywords?.length,
+            documentId,
+            hasDocumentId: !!documentId,
             tocItems: toc?.slice(0, 3) // 첫 3개 목차 확인
         });
+
+        // documentId가 있으면 기존 저장된 요약 확인
+        if (documentId) {
+            console.log('🔍 [Summary API] 기존 요약 확인 중:', documentId);
+            const existsResult = await checkFieldExists(documentId, 'summary');
+
+            if (existsResult.exists) {
+                console.log('✅ [Summary API] 기존 요약 발견, 저장된 데이터 반환');
+                return NextResponse.json(
+                    {
+                        message: '기존 저장된 요약을 사용합니다.',
+                        useExisting: true,
+                        summary: existsResult.data // 실제 저장된 요약 데이터
+                    },
+                    { status: 200 }
+                );
+            }
+            console.log('📭 [Summary API] 기존 요약 없음, 새로 생성');
+        }
 
         // 상세한 인자 로그 추가
         console.log('📋 [Summary API] 전체 프롬프트 인자들:');
@@ -191,6 +213,8 @@ ${text}
 
         // 스트리밍 응답 생성
         const encoder = new TextEncoder();
+        let accumulatedContent = ''; // 전체 요약 내용을 누적하기 위한 변수
+
         const stream = new ReadableStream({
             async start(controller) {
                 try {
@@ -210,11 +234,35 @@ ${text}
                             console.log('📨 [Full Summary] 청크 수신:', {
                                 chunkLength: chunkText.length
                             });
+
+                            // 전체 내용 누적
+                            accumulatedContent += chunkText;
+
                             controller.enqueue(encoder.encode(chunkText));
                         }
                     }
 
                     console.log('✅ [Full Summary] 스트림 완료');
+
+                    // documentId가 있으면 자동 저장
+                    if (documentId && accumulatedContent.trim()) {
+                        console.log('💾 [Summary API] 자동 저장 시작');
+                        try {
+                            const saveResult = await updateAnalyzedInfo(documentId, {
+                                summary: accumulatedContent.trim()
+                            });
+
+                            if (saveResult.success) {
+                                console.log('✅ [Summary API] 자동 저장 성공:', saveResult.documentPath);
+                            } else {
+                                console.error('❌ [Summary API] 자동 저장 실패:', saveResult.error);
+                            }
+                        } catch (saveError) {
+                            console.error('❌ [Summary API] 자동 저장 오류:', saveError);
+                            // 저장 실패해도 스트림은 정상 완료 처리 (저장은 부가 기능)
+                        }
+                    }
+
                     controller.close();
                 } catch (error: any) {
                     console.error('❌ [Full Summary] 스트림 오류:', error);

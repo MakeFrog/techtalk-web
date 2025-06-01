@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/analyzedInfoService';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -7,10 +8,12 @@ export async function POST(request: NextRequest) {
     try {
         console.log('🔍 [Keywords API] 요청 시작');
 
-        const { title, text } = await request.json();
+        const { title, text, documentId } = await request.json();
         console.log('📥 [Keywords API] 요청 데이터:', {
             titleLength: title?.length,
-            textLength: text?.length
+            textLength: text?.length,
+            documentId,
+            hasDocumentId: !!documentId
         });
 
         if (!title || !text) {
@@ -19,6 +22,25 @@ export async function POST(request: NextRequest) {
                 { error: '제목과 본문이 필요합니다.' },
                 { status: 400 }
             );
+        }
+
+        // documentId가 있으면 기존 저장된 키워드 확인
+        if (documentId) {
+            console.log('🔍 [Keywords API] 기존 키워드 확인 중:', documentId);
+            const existsResult = await checkFieldExists(documentId, 'programming_keywords');
+
+            if (existsResult.exists) {
+                console.log('✅ [Keywords API] 기존 키워드 발견, 저장된 데이터 반환');
+                return NextResponse.json(
+                    {
+                        message: '기존 저장된 키워드를 사용합니다.',
+                        useExisting: true,
+                        keywords: existsResult.data // 실제 저장된 키워드 데이터
+                    },
+                    { status: 200 }
+                );
+            }
+            console.log('📭 [Keywords API] 기존 키워드 없음, 새로 생성');
         }
 
         console.log('🔑 [Keywords API] API 키 확인:', !!process.env.GEMINI_API_KEY);
@@ -100,6 +122,26 @@ ${text}
 
         console.log('🎯 [Keywords API] JSON 추출 성공');
         const keywordsData = JSON.parse(jsonMatch[1]);
+
+        // documentId가 있으면 자동 저장
+        if (documentId && keywordsData.keywords && Array.isArray(keywordsData.keywords)) {
+            console.log('💾 [Keywords API] 자동 저장 시작');
+            try {
+                const saveResult = await updateAnalyzedInfo(documentId, {
+                    programming_keywords: keywordsData.keywords
+                });
+
+                if (saveResult.success) {
+                    console.log('✅ [Keywords API] 자동 저장 성공:', saveResult.documentPath);
+                } else {
+                    console.error('❌ [Keywords API] 자동 저장 실패:', saveResult.error);
+                }
+            } catch (saveError) {
+                console.error('❌ [Keywords API] 자동 저장 오류:', saveError);
+                // 저장 실패해도 응답은 정상 반환 (저장은 부가 기능)
+            }
+        }
+
         console.log('✅ [Keywords API] 성공 완료, 키워드 수:', keywordsData.keywords?.length);
 
         return NextResponse.json(keywordsData);

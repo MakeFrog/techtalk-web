@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
+import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/analyzedInfoService';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -21,7 +22,7 @@ async function retryWithBackoff<T>(
             if (error?.status === 429 && attempt < maxRetries) {
                 // Exponential backoff: 1초, 2초, 4초, 8초...
                 const delay = baseDelay * Math.pow(2, attempt);
-                console.log(`⏳ [Question] Rate limit 도달, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+                console.log(`⏳ [Questions] Rate limit 도달, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
                 await sleep(delay);
                 continue;
             }
@@ -35,7 +36,13 @@ export async function POST(request: NextRequest) {
     try {
         console.log('🚀 [Question API] 스트림 요청 시작');
 
-        const { title, content } = await request.json();
+        const { title, content, documentId } = await request.json();
+        console.log('📋 [Question API] 요청 데이터:', {
+            title: title?.substring(0, 50) + '...',
+            textLength: content?.length || 0,
+            documentId,
+            hasDocumentId: !!documentId
+        });
 
         if (!title || !content) {
             return NextResponse.json(
@@ -44,10 +51,25 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        console.log('📋 [Question API] 요청 데이터:', {
-            title: title.substring(0, 50) + '...',
-            textLength: content.length
-        });
+        // documentId가 있으면 기존 QnA 확인
+        if (documentId) {
+            console.log('🔍 [Questions API] 기존 QnA 확인 중:', documentId);
+
+            const existsResult = await checkFieldExists(documentId, 'qna');
+            if (existsResult.exists) {
+                console.log('✅ [Questions API] 기존 QnA 발견, 저장된 데이터 반환');
+
+                return NextResponse.json(
+                    {
+                        message: '기존 저장된 질문을 사용합니다.',
+                        useExisting: true,
+                        data: existsResult.data // 실제 저장된 QnA 데이터 포함
+                    },
+                    { status: 200 }
+                );
+            }
+            console.log('📭 [Questions API] 기존 QnA 없음, 새로 생성');
+        }
 
         // Gemini 2.0 Flash 모델 설정
         const model = genAI.getGenerativeModel({
@@ -110,6 +132,8 @@ export async function POST(request: NextRequest) {
 
         // 스트림 응답 설정
         const encoder = new TextEncoder();
+        let accumulatedQuestions: any[] = []; // 전체 질문들을 누적하기 위한 배열
+
         const stream = new ReadableStream({
             async start(controller) {
                 console.log('🔄 [Question] 스트림 시작');
@@ -124,45 +148,29 @@ export async function POST(request: NextRequest) {
 
                     let buffer = '';
                     let questionCount = 0;
-                    let chunkCount = 0;
-                    const processedJsonBlocks = new Set<string>(); // 중복 처리 방지
+                    const processedJsonBlocks = new Set<string>();
 
+                    // 스트림 처리
                     for await (const chunk of result.stream) {
                         const chunkText = chunk.text();
                         if (chunkText) {
-                            chunkCount++;
                             buffer += chunkText;
 
-                            console.log('📨 [Question] 청크 수신:', {
-                                chunkNumber: chunkCount,
-                                chunkLength: chunkText.length,
-                                bufferLength: buffer.length,
-                                questionCount,
-                                preview: chunkText.substring(0, 100) + '...'
-                            });
+                            // JSON 블록들을 찾아서 처리
+                            const jsonBlockRegex = /```json\s*(\{[\s\S]*?\})\s*```/g;
+                            let match;
 
-                            // JSON 블록 추출 시도 - 개선된 정규식
-                            const jsonMatches = [...buffer.matchAll(/```json\s*(\{[\s\S]*?\})\s*```/g)];
+                            while ((match = jsonBlockRegex.exec(buffer)) !== null) {
+                                const fullMatch = match[0];
+                                const jsonContent = match[1];
 
-                            if (jsonMatches.length > 0) {
-                                console.log(`🔍 [Question] ${jsonMatches.length}개 JSON 블록 발견 (청크 ${chunkCount})`);
-
-                                for (const match of jsonMatches) {
-                                    const fullMatch = match[0];
-                                    const jsonContent = match[1].trim();
-
-                                    // 이미 처리된 JSON 블록은 건너뛰기
-                                    if (processedJsonBlocks.has(jsonContent)) {
-                                        console.log('⏭️ [Question] 이미 처리된 JSON 블록 건너뛰기');
-                                        continue;
-                                    }
-
+                                if (!processedJsonBlocks.has(jsonContent)) {
                                     try {
                                         const questionData = JSON.parse(jsonContent);
 
                                         if (questionData.question && questionData.answer) {
                                             questionCount++;
-                                            processedJsonBlocks.add(jsonContent); // 처리된 블록으로 표시
+                                            processedJsonBlocks.add(jsonContent);
 
                                             console.log(`✨ [Question] ${questionCount}번째 질문 전송:`, {
                                                 question: questionData.question.substring(0, 50) + '...',
@@ -170,6 +178,9 @@ export async function POST(request: NextRequest) {
                                                 jsonLength: jsonContent.length,
                                                 bufferLength: buffer.length
                                             });
+
+                                            // 질문 데이터를 누적 배열에 추가
+                                            accumulatedQuestions.push(questionData);
 
                                             // 클라이언트로 질문 데이터 전송
                                             const dataString = `data: ${JSON.stringify(questionData)}\n\n`;
@@ -183,35 +194,39 @@ export async function POST(request: NextRequest) {
                                     } catch (parseError) {
                                         console.warn('⚠️ [Question] JSON 파싱 실패:', {
                                             jsonContent: jsonContent.substring(0, 100),
-                                            error: parseError instanceof Error ? parseError.message : parseError
+                                            error: parseError
                                         });
                                     }
                                 }
                             }
 
-                            // 6개 질문이 생성되면 조기 종료 (최대 허용)
-                            if (questionCount >= 6) {
-                                console.log('🎯 [Question] 최대 질문 수(6개) 달성, 스트림 종료');
+                            // 질문이 5개에 도달하면 스트림 종료
+                            if (questionCount >= 5) {
+                                console.log('🎯 [Question] 최대 질문 수(5개) 도달, 스트림 종료');
                                 break;
                             }
-                        } else {
-                            console.log('📭 [Question] 빈 청크 수신');
                         }
                     }
 
-                    // 스트림 종료 후 상태 확인
-                    console.log(`✅ [Question] 스트림 완료 - 총 ${questionCount}개 질문 생성 (권장: 2-6개)`);
-                    console.log(`📊 [Question] 처리 통계:`, {
-                        totalChunks: chunkCount,
-                        questionsGenerated: questionCount,
-                        uniqueJsonBlocks: processedJsonBlocks.size,
-                        bufferRemaining: buffer.length
-                    });
+                    console.log(`🎯 [Question] 총 ${questionCount}개 질문 처리 완료`);
 
-                    // 질문이 하나도 생성되지 않은 경우 경고
-                    if (questionCount === 0) {
-                        console.warn(`⚠️ [Question] 질문이 생성되지 않음 - 콘텐츠에 적절한 프로그래밍 개념이 없을 수 있음`);
-                        console.warn(`🔍 [Question] 전체 버퍼 내용:`, buffer.substring(0, 500));
+                    // documentId가 있으면 자동 저장
+                    if (documentId && accumulatedQuestions.length > 0) {
+                        console.log('💾 [Question] 자동 저장 시작');
+                        try {
+                            const saveResult = await updateAnalyzedInfo(documentId, {
+                                qna: accumulatedQuestions
+                            });
+
+                            if (saveResult.success) {
+                                console.log('✅ [Question] 자동 저장 성공:', saveResult.documentPath);
+                            } else {
+                                console.error('❌ [Question] 자동 저장 실패:', saveResult.error);
+                            }
+                        } catch (saveError) {
+                            console.error('❌ [Question] 자동 저장 오류:', saveError);
+                            // 저장 실패해도 스트림은 정상 완료 처리 (저장은 부가 기능)
+                        }
                     }
 
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -222,11 +237,12 @@ export async function POST(request: NextRequest) {
 
                     // 429 에러 특별 처리
                     if (error?.status === 429) {
-                        const errorMessage = 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.';
-                        controller.enqueue(encoder.encode(`data: {"error": "${errorMessage}"}\n\n`));
+                        const errorData = `data: ${JSON.stringify({ error: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' })}\n\n`;
+                        controller.enqueue(encoder.encode(errorData));
                     } else {
                         const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
-                        controller.enqueue(encoder.encode(`data: {"error": "${errorMessage}"}\n\n`));
+                        const errorData = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
+                        controller.enqueue(encoder.encode(errorData));
                     }
 
                     controller.close();

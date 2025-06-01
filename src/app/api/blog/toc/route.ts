@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/analyzedInfoService';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -7,10 +8,12 @@ export async function POST(request: NextRequest) {
     try {
         console.log('🔍 [TOC API] 요청 시작');
 
-        const { title, text } = await request.json();
+        const { title, text, documentId } = await request.json();
         console.log('📥 [TOC API] 요청 데이터:', {
             titleLength: title?.length,
-            textLength: text?.length
+            textLength: text?.length,
+            documentId,
+            hasDocumentId: !!documentId
         });
 
         if (!title || !text) {
@@ -19,6 +22,25 @@ export async function POST(request: NextRequest) {
                 { error: '제목과 본문이 필요합니다.' },
                 { status: 400 }
             );
+        }
+
+        // documentId가 있으면 기존 저장된 목차 확인
+        if (documentId) {
+            console.log('🔍 [TOC API] 기존 목차 확인 중:', documentId);
+            const existsResult = await checkFieldExists(documentId, 'toc');
+
+            if (existsResult.exists) {
+                console.log('✅ [TOC API] 기존 목차 발견, 저장된 데이터 반환');
+                return NextResponse.json(
+                    {
+                        message: '기존 저장된 목차를 사용합니다.',
+                        useExisting: true,
+                        toc: existsResult.data // 실제 저장된 목차 데이터
+                    },
+                    { status: 200 }
+                );
+            }
+            console.log('📭 [TOC API] 기존 목차 없음, 새로 생성');
         }
 
         console.log('🔑 [TOC API] API 키 확인:', !!process.env.GEMINI_API_KEY);
@@ -101,6 +123,26 @@ ${text}
 
         console.log('🎯 [TOC API] JSON 추출 성공');
         const tocData = JSON.parse(jsonMatch[1]);
+
+        // documentId가 있으면 자동 저장 (string[] 형태로 저장)
+        if (documentId && tocData.toc && Array.isArray(tocData.toc)) {
+            console.log('💾 [TOC API] 자동 저장 시작');
+            try {
+                const saveResult = await updateAnalyzedInfo(documentId, {
+                    toc: tocData.toc // string[] 형태로 저장
+                });
+
+                if (saveResult.success) {
+                    console.log('✅ [TOC API] 자동 저장 성공:', saveResult.documentPath);
+                } else {
+                    console.error('❌ [TOC API] 자동 저장 실패:', saveResult.error);
+                }
+            } catch (saveError) {
+                console.error('❌ [TOC API] 자동 저장 오류:', saveError);
+                // 저장 실패해도 응답은 정상 반환 (저장은 부가 기능)
+            }
+        }
+
         console.log('✅ [TOC API] 성공 완료, 목차 수:', tocData.toc?.length);
 
         return NextResponse.json(tocData);

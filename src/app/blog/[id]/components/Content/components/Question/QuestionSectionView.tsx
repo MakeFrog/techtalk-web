@@ -13,21 +13,35 @@ import { useEffect } from "react";
  * 답변은 숨기고 질문만 표시
  */
 export function QuestionSectionView() {
-    const { state } = useBlogBasicInfo();
-    const { questions, isLoading, error, generateQuestions } = useQuestionStream();
+    const { state: blogState } = useBlogBasicInfo();
+    const { state: questionState, startStreaming } = useQuestionStream();
+
+    // 상태별 데이터 추출
+    const questions = questionState.status === 'streaming' || questionState.status === 'completed'
+        ? questionState.questions
+        : questionState.status === 'error'
+            ? questionState.questions
+            : [];
+
+    const isLoading = questionState.status === 'loading';
+    const error = questionState.status === 'error' ? questionState.message : null;
 
     // BlogBasicInfoProvider에서 제목과 내용이 로드되면 질문 생성 시작
     useEffect(() => {
-        if (state.status === 'success' && questions.length === 0 && !isLoading) {
-            const { title, content } = state.data;
+        if (blogState.status === 'success' &&
+            questions.length === 0 &&
+            questionState.status === 'idle') {
+
+            const { title, content } = blogState.data;
             console.log('🚀 [QuestionSectionView] 질문 생성 시작:', {
                 hasQuestions: questions.length > 0,
-                isLoading,
+                questionState: questionState.status,
                 title: title.substring(0, 50) + '...'
             });
-            generateQuestions(title, content);
+
+            startStreaming({ title, content });
         }
-    }, [state, questions.length, isLoading]);
+    }, [blogState, questions.length, questionState.status, startStreaming]);
 
     return (
         <div style={{

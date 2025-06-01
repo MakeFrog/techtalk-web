@@ -23,6 +23,8 @@ const JOB_GROUPS_COLLECTION = 'JobGroup';
 // 세션 스토리지 키
 const CACHE_SESSION_KEY = 'techset-cache-loaded';
 const CACHE_EXPIRY_KEY = 'techset-cache-expiry';
+const SKILLS_DATA_KEY = 'techset-skills-data';
+const JOB_GROUPS_DATA_KEY = 'techset-job-groups-data';
 const CACHE_DURATION = 30 * 60 * 1000; // 30분
 
 /**
@@ -45,15 +47,38 @@ function isSessionCacheValid(): boolean {
 }
 
 /**
+ * 세션 캐시에서 데이터 로드
+ */
+function loadFromSessionCache(): { skills: SkillEntity[]; jobGroups: JobGroupEntity[] } | null {
+    if (typeof window === 'undefined') return null;
+
+    try {
+        const skillsData = sessionStorage.getItem(SKILLS_DATA_KEY);
+        const jobGroupsData = sessionStorage.getItem(JOB_GROUPS_DATA_KEY);
+
+        if (!skillsData || !jobGroupsData) return null;
+
+        const skills: SkillEntity[] = JSON.parse(skillsData);
+        const jobGroups: JobGroupEntity[] = JSON.parse(jobGroupsData);
+
+        return { skills, jobGroups };
+    } catch {
+        return null;
+    }
+}
+
+/**
  * 세션 캐시 설정
  */
-function setSessionCache(): void {
+function setSessionCache(skills: SkillEntity[], jobGroups: JobGroupEntity[]): void {
     if (typeof window === 'undefined') return;
 
     try {
         const expiryTime = Date.now() + CACHE_DURATION;
         sessionStorage.setItem(CACHE_SESSION_KEY, 'true');
         sessionStorage.setItem(CACHE_EXPIRY_KEY, expiryTime.toString());
+        sessionStorage.setItem(SKILLS_DATA_KEY, JSON.stringify(skills));
+        sessionStorage.setItem(JOB_GROUPS_DATA_KEY, JSON.stringify(jobGroups));
     } catch {
         // 세션 스토리지 실패해도 무시
     }
@@ -114,22 +139,28 @@ export function useTechSetCache(): TechSetCacheResult {
                 return;
             }
 
-            // 세션 캐시가 유효하더라도 메모리 캐시에 실제 데이터가 없으면 Firestore에서 가져와야 함
-            const hasActualData = techSetRepository.getAllSkills().length > 0 || techSetRepository.getAllJobGroups().length > 0;
+            // 세션 캐시가 유효한지 확인
+            if (isSessionCacheValid()) {
+                // 세션 캐시에서 데이터 로드 시도
+                const cachedData = loadFromSessionCache();
 
-            if (isSessionCacheValid() && hasActualData) {
-                console.log('✅ [TechSetCache] 세션 캐시 유효하고 메모리에 데이터 있음, Firestore 호출 생략');
-                techSetRepository.setCacheStatus('loaded');
-                setResult({ status: 'success', error: null });
-                return;
+                if (cachedData) {
+                    console.log('✅ [TechSetCache] 세션 캐시에서 데이터 로드 성공');
+                    console.log(`📊 [TechSetCache] 세션에서 로드된 Skill: ${cachedData.skills.length}개`);
+                    console.log(`📊 [TechSetCache] 세션에서 로드된 JobGroup: ${cachedData.jobGroups.length}개`);
+
+                    // 메모리 캐시에 저장
+                    techSetRepository.setSkills(cachedData.skills);
+                    techSetRepository.setJobGroups(cachedData.jobGroups);
+                    techSetRepository.setCacheStatus('loaded');
+
+                    setResult({ status: 'success', error: null });
+                    return;
+                }
             }
 
-            // 세션 캐시가 있어도 실제 데이터가 없으면 로드 필요
-            if (isSessionCacheValid() && !hasActualData) {
-                console.log('⚠️ [TechSetCache] 세션 캐시는 있지만 메모리에 데이터 없음, Firestore에서 로드');
-            } else if (!isSessionCacheValid()) {
-                console.log('🔄 [TechSetCache] 세션 캐시 만료 또는 없음, Firestore에서 로드');
-            }
+            // 세션 캐시가 없거나 유효하지 않은 경우에만 Firestore에서 로드
+            console.log('🔄 [TechSetCache] 세션 캐시 없음 또는 만료, Firestore에서 로드');
 
             try {
                 console.log('🔄 [TechSetCache] Firestore에서 데이터 로딩 시작');
@@ -167,7 +198,7 @@ export function useTechSetCache(): TechSetCacheResult {
                 techSetRepository.setCacheStatus('loaded');
 
                 // 세션 캐시 설정
-                setSessionCache();
+                setSessionCache(skills, jobGroups);
 
                 console.log('✅ [TechSetCache] 초기화 완료');
                 setResult({ status: 'success', error: null });

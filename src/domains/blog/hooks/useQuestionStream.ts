@@ -41,6 +41,10 @@ export function useQuestionStream(): UseQuestionStreamReturn {
             });
 
             if (!response.ok) {
+                // 429 에러 특별 처리
+                if (response.status === 429) {
+                    throw new Error('API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+                }
                 throw new Error(`API 요청 실패: ${response.status}`);
             }
 
@@ -65,72 +69,70 @@ export function useQuestionStream(): UseQuestionStreamReturn {
                 }
 
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+                console.log('📨 [useQuestionStream] 스트림 데이터 수신:', { bufferLength: buffer.length });
 
-                console.log('📥 [useQuestionStream] 수신된 라인들:', {
-                    lineCount: lines.length,
-                    bufferLength: buffer.length
-                });
+                // SSE 형식으로 파싱
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || ''; // 마지막 불완전한 줄은 버퍼에 유지
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
+                        const dataStr = line.slice(6); // 'data: ' 제거
 
-                        if (data === '[DONE]') {
-                            console.log('🏁 [useQuestionStream] 스트림 종료 신호');
-                            setIsLoading(false);
+                        if (dataStr === '[DONE]') {
+                            console.log('🏁 [useQuestionStream] 스트림 종료 신호 수신');
                             break;
                         }
 
                         try {
-                            const questionData = JSON.parse(data);
+                            const data = JSON.parse(dataStr);
 
-                            if (questionData.question && questionData.answer) {
-                                // 중복 질문 체크 (질문 텍스트 기준)
-                                const questionKey = questionData.question.trim();
-                                if (processedQuestions.has(questionKey)) {
-                                    console.log('⏭️ [useQuestionStream] 중복 질문 건너뛰기:',
-                                        questionKey.substring(0, 50) + '...');
-                                    continue;
-                                }
+                            // 에러 처리
+                            if (data.error) {
+                                console.error('❌ [useQuestionStream] 서버 에러:', data.error);
+                                setError(data.error);
+                                break;
+                            }
 
-                                questionCount++;
+                            // 중복 질문 방지
+                            const questionKey = `${data.question}_${data.answer}`;
+                            if (!processedQuestions.has(questionKey)) {
                                 processedQuestions.add(questionKey);
+                                questionCount++;
 
-                                console.log(`✨ [useQuestionStream] ${questionCount}번째 새 질문 추가:`, {
-                                    question: questionData.question.substring(0, 50) + '...',
-                                    answer: questionData.answer.substring(0, 30) + '...',
-                                    totalQuestions: questionCount
+                                console.log(`✨ [useQuestionStream] ${questionCount}번째 질문 수신:`, {
+                                    question: data.question?.substring(0, 50) + '...',
+                                    answer: data.answer?.substring(0, 30) + '...'
                                 });
 
-                                // 새 질문을 기존 질문 목록에 추가
-                                setQuestions(prev => {
-                                    const newQuestions = [...prev, questionData];
-                                    console.log('📝 [useQuestionStream] 상태 업데이트:', {
-                                        previousCount: prev.length,
-                                        newCount: newQuestions.length
-                                    });
-                                    return newQuestions;
-                                });
+                                setQuestions(prev => [...prev, data]);
                             } else {
-                                console.warn('⚠️ [useQuestionStream] 질문 데이터 형식 오류:', questionData);
+                                console.log('⏭️ [useQuestionStream] 중복 질문 건너뛰기');
                             }
                         } catch (parseError) {
-                            console.warn('⚠️ [useQuestionStream] 데이터 파싱 실패:', {
-                                data: data.substring(0, 100),
-                                error: parseError instanceof Error ? parseError.message : parseError
+                            console.warn('⚠️ [useQuestionStream] JSON 파싱 실패:', {
+                                data: dataStr.substring(0, 100),
+                                error: parseError
                             });
                         }
                     }
                 }
             }
 
-            console.log(`🎯 [useQuestionStream] 최종 결과: ${questionCount}개 질문 생성`);
+            console.log(`🎯 [useQuestionStream] 총 ${questionCount}개 질문 처리 완료`);
 
-        } catch (err) {
-            console.error('❌ [useQuestionStream] 오류:', err);
-            setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다');
+        } catch (error: any) {
+            console.error('❌ [useQuestionStream] 스트림 오류:', error);
+
+            // 429 에러에 대한 사용자 친화적 메시지
+            if (error.message.includes('API 요청 한도')) {
+                setError('🚫 API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+            } else if (error.message.includes('429')) {
+                setError('🚫 너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.');
+            } else {
+                setError(error instanceof Error ? error.message : '질문 생성에 실패했습니다.');
+            }
+        } finally {
             setIsLoading(false);
         }
     }, []);
@@ -140,6 +142,6 @@ export function useQuestionStream(): UseQuestionStreamReturn {
         isLoading,
         error,
         generateQuestions,
-        reset,
+        reset
     };
 } 

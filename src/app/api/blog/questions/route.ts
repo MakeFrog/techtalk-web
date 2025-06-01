@@ -3,6 +3,34 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
+// Rate limiting을 위한 유틸리티 함수들
+async function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            // 429 에러인 경우에만 재시도
+            if (error?.status === 429 && attempt < maxRetries) {
+                // Exponential backoff: 1초, 2초, 4초, 8초...
+                const delay = baseDelay * Math.pow(2, attempt);
+                console.log(`⏳ [Question] Rate limit 도달, ${delay}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+                await sleep(delay);
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error('최대 재시도 횟수 초과');
+}
+
 export async function POST(request: NextRequest) {
     try {
         console.log('🚀 [Question API] 스트림 요청 시작');
@@ -79,7 +107,12 @@ export async function POST(request: NextRequest) {
                 console.log('🔄 [Question] 스트림 시작');
 
                 try {
-                    const result = await model.generateContentStream(streamPrompt);
+                    // 재시도 로직으로 스트림 생성
+                    const result = await retryWithBackoff(
+                        () => model.generateContentStream(streamPrompt),
+                        3, // 최대 3회 재시도
+                        2000 // 기본 2초 대기
+                    );
 
                     let buffer = '';
                     let questionCount = 0;
@@ -176,9 +209,19 @@ export async function POST(request: NextRequest) {
                     controller.enqueue(encoder.encode('data: [DONE]\n\n'));
                     controller.close();
 
-                } catch (error) {
+                } catch (error: any) {
                     console.error('❌ [Question] 스트림 오류:', error);
-                    controller.error(error);
+
+                    // 429 에러 특별 처리
+                    if (error?.status === 429) {
+                        const errorMessage = 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.';
+                        controller.enqueue(encoder.encode(`data: {"error": "${errorMessage}"}\n\n`));
+                    } else {
+                        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+                        controller.enqueue(encoder.encode(`data: {"error": "${errorMessage}"}\n\n`));
+                    }
+
+                    controller.close();
                 }
             }
         });
@@ -191,8 +234,20 @@ export async function POST(request: NextRequest) {
             },
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ [Question API] 처리 실패:', error);
+
+        // 429 에러 특별 처리
+        if (error?.status === 429) {
+            return NextResponse.json(
+                {
+                    error: 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.',
+                    retryAfter: '60초 후 재시도 가능'
+                },
+                { status: 429 }
+            );
+        }
+
         return NextResponse.json(
             { error: '면접 질문 생성 실패', details: error instanceof Error ? error.message : '알 수 없는 오류' },
             { status: 500 }

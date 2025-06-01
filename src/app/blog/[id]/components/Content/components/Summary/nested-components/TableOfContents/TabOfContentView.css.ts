@@ -50,3 +50,21 @@ export const linkAnchor = style({
         transform: 'translateX(2px)',
     },
 });
+
+export const loadingState = style({
+    ...textStyles.body2,
+    color: '#888',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: '20px 0',
+});
+
+export const errorState = style({
+    ...textStyles.body2,
+    color: '#e74c3c',
+    textAlign: 'center',
+    padding: '20px 0',
+    backgroundColor: '#fdf2f2',
+    borderRadius: '4px',
+    border: '1px solid #fecaca',
+});

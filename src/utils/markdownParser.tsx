@@ -11,6 +11,7 @@ interface ParseMarkdownOptions {
     italicClassName?: string;
     conceptKeywordClassName?: string;
     onConceptClick?: (keyword: string, event: React.MouseEvent) => void;
+    validKeywords?: string[]; // 유효한 키워드 목록 추가
 }
 
 // 공통 마크다운 스타일 프리셋
@@ -52,7 +53,11 @@ export const MARKDOWN_STYLE_PRESETS = {
  * @param options 스타일 클래스 옵션
  * @returns JSX 요소 배열
  */
-export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) => {
+export const parseMarkdown = (
+    text: string,
+    options: ParseMarkdownOptions = {},
+    baseKey: string = 'markdown'
+): React.ReactNode[] => {
     const {
         inlineCodeClassName = '',
         textSpanClassName = '',
@@ -61,8 +66,14 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
         boldClassName = '',
         italicClassName = '',
         conceptKeywordClassName = '',
-        onConceptClick
+        onConceptClick,
+        validKeywords = []
     } = options;
+
+    // 빈 텍스트 처리
+    if (!text || !text.trim()) {
+        return [<span key="empty" />];
+    }
 
     // 코드 블록 파싱 (```으로 감싸진 부분)
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
@@ -78,14 +89,18 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
 
         // 일반 텍스트 부분 처리
         if (textPart) {
-            const { parsedElements, newHeadingCounter } = parseInlineElements(textPart, {
+            // 코드 블록 앞의 단순 구분자 줄 제거 (예: "-\n```" 에서 "-" 제거)
+            const cleanedTextPart = textPart.replace(/\n-\s*$/, '').replace(/^-\s*\n/, '');
+
+            const { parsedElements, newHeadingCounter } = parseInlineElements(cleanedTextPart, {
                 inlineCodeClassName,
                 textSpanClassName,
                 blockquoteClassName,
                 boldClassName,
                 italicClassName,
                 conceptKeywordClassName,
-                onConceptClick
+                onConceptClick,
+                validKeywords
             }, elements.length, headingCounter);
 
             elements.push(...parsedElements);
@@ -96,13 +111,13 @@ export const parseMarkdown = (text: string, options: ParseMarkdownOptions = {}) 
         if (codePart !== undefined) {
             const codeLanguage = language || 'text';
             elements.push(
-                <div key={`codeblock-${elements.length}`} className={codeBlockClassName}>
+                <div key={`codeblock-${elements.length}`} className={codeBlockClassName} style={{ margin: 0 }}>
                     <SyntaxHighlighter
                         language={codeLanguage}
                         style={oneDark}
                         customStyle={{
                             margin: 0,
-                            padding: '8px 12px',
+                            padding: '16px',
                             borderRadius: '8px',
                             fontSize: '14px',
                         }}
@@ -138,7 +153,8 @@ const parseInlineElements = (
         boldClassName = '',
         italicClassName = '',
         conceptKeywordClassName = '',
-        onConceptClick
+        onConceptClick,
+        validKeywords = []
     } = options;
 
     // 줄 단위로 분리하여 각종 블록 요소 처리
@@ -161,14 +177,6 @@ const parseInlineElements = (
             const hasNumberPrefix = /^\d+\.\s/.test(titleText);
             const formattedTitle = hasNumberPrefix ? titleText : `${headingCounter}. ${titleText}`;
 
-            console.log(`🔍 [마크다운 파서] 제목 처리:`, {
-                원본: titleText,
-                포맷된제목: formattedTitle,
-                앵커ID: anchorId,
-                레벨: level,
-                현재카운터: headingCounter
-            });
-
             elements.push(
                 React.createElement(HeadingTag, {
                     key: `heading-${baseKey}-${lineIndex}`,
@@ -180,14 +188,7 @@ const parseInlineElements = (
                         lineHeight: '1.4',
                         color: '#1a1a1a'
                     }
-                }, parseTextFormatting(formattedTitle, {
-                    inlineCodeClassName,
-                    textSpanClassName,
-                    boldClassName,
-                    italicClassName,
-                    conceptKeywordClassName,
-                    onConceptClick
-                }, `${baseKey}-heading-${lineIndex}`))
+                }, formattedTitle) // 키워드 파싱 제거, 단순 텍스트로 처리
             );
 
             headingCounter++; // 제목 카운터 증가
@@ -195,12 +196,7 @@ const parseInlineElements = (
         // 리스트 아이템 처리 (- 또는 * 로 시작)
         else if (trimmedLine.match(/^[-*]\s+/)) {
             const listText = trimmedLine.replace(/^[-*]\s+/, '');
-            console.log(`🔍 [마크다운 파서] 리스트 아이템 처리:`, {
-                원본라인: line,
-                트림된라인: trimmedLine,
-                리스트텍스트: listText,
-                매칭결과: trimmedLine.match(/^[-*]\s+/)
-            });
+
             elements.push(
                 <div
                     key={`list-item-${baseKey}-${lineIndex}`}
@@ -232,7 +228,8 @@ const parseInlineElements = (
                             boldClassName,
                             italicClassName,
                             conceptKeywordClassName,
-                            onConceptClick
+                            onConceptClick,
+                            validKeywords
                         }, `${baseKey}-list-${lineIndex}`)}
                     </span>
                 </div>
@@ -249,31 +246,37 @@ const parseInlineElements = (
                         boldClassName,
                         italicClassName,
                         conceptKeywordClassName,
-                        onConceptClick
+                        onConceptClick,
+                        validKeywords
                     }, `${baseKey}-${lineIndex}`)}
                 </blockquote>
             );
         }
-        // 빈 줄 처리
+        // 빈 줄 처리 - 코드 블록 주변의 빈 줄은 무시
         else if (!trimmedLine) {
-            elements.push(<br key={`br-${baseKey}-${lineIndex}`} />);
+            // 이전 요소나 다음 요소가 코드 블록인지 확인
+            const prevLine = lineIndex > 0 ? lines[lineIndex - 1]?.trim() : '';
+            const nextLine = lineIndex < lines.length - 1 ? lines[lineIndex + 1]?.trim() : '';
+
+            // 코드 블록 바로 앞뒤의 빈 줄은 무시
+            if (prevLine.includes('```') || nextLine.includes('```')) {
+                // 빈 줄 무시
+            } else {
+                elements.push(<br key={`br-${baseKey}-${lineIndex}`} />);
+            }
         }
         // 일반 텍스트 처리
         else {
-            console.log(`🔍 [마크다운 파서] 일반 텍스트 처리:`, {
-                원본라인: line,
-                트림된라인: trimmedLine,
-                라인인덱스: lineIndex
-            });
             elements.push(
-                <div key={`text-${baseKey}-${lineIndex}`} style={{ margin: '8px 0', lineHeight: '1.6' }}>
+                <div key={`text-${baseKey}-${lineIndex}`} style={{ margin: '4px 0', lineHeight: '1.6' }}>
                     {parseTextFormatting(line, {
                         inlineCodeClassName,
                         textSpanClassName,
                         boldClassName,
                         italicClassName,
                         conceptKeywordClassName,
-                        onConceptClick
+                        onConceptClick,
+                        validKeywords
                     }, `${baseKey}-${lineIndex}`)}
                 </div>
             );
@@ -284,25 +287,88 @@ const parseInlineElements = (
 };
 
 /**
- * 텍스트 포맷팅 요소들을 파싱 (인라인 코드, 볼드, 이탤릭, concept 링크)
+ * 텍스트 포맷팅 처리 (굵게, 기울임꼴, 인라인 코드, concept 링크)
  */
 const parseTextFormatting = (
     text: string,
-    options: ParseMarkdownOptions,
+    options: {
+        inlineCodeClassName?: string;
+        textSpanClassName?: string;
+        boldClassName?: string;
+        italicClassName?: string;
+        conceptKeywordClassName?: string;
+        onConceptClick?: (keyword: string, event: React.MouseEvent) => void;
+        validKeywords?: string[]; // 유효한 키워드 목록 추가
+    },
+    baseKey: string
+): React.ReactNode[] => {
+    const elements: React.ReactNode[] = [];
+
+    // Bold (**text**) 처리
+    const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
+
+    boldParts.forEach((part, index) => {
+        const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+
+        if (boldMatch) {
+            const [, boldText] = boldMatch;
+            elements.push(
+                <span key={`${baseKey}-bold-${index}`} className={options.boldClassName || ''}>
+                    {parseTextFormatting(boldText, {
+                        ...options,
+                        boldClassName: undefined // 중첩 방지
+                    }, `${baseKey}-bold-${index}`)}
+                </span>
+            );
+        } else {
+            // Italic (*text*) 처리
+            const italicParts = part.split(/(\*[^*]+\*)/g);
+
+            italicParts.forEach((italicPart, italicIndex) => {
+                const italicMatch = italicPart.match(/^\*([^*]+)\*$/);
+
+                if (italicMatch) {
+                    const [, italicText] = italicMatch;
+                    elements.push(
+                        <span key={`${baseKey}-italic-${index}-${italicIndex}`} className={options.italicClassName || ''}>
+                            {parseInnerFormatting(italicText, options, `${baseKey}-italic-${index}-${italicIndex}`)}
+                        </span>
+                    );
+                } else {
+                    // 일반 텍스트 처리
+                    const innerElements = parseInnerFormatting(italicPart, options, `${baseKey}-inner-${index}-${italicIndex}`);
+                    elements.push(...innerElements);
+                }
+            });
+        }
+    });
+
+    return elements;
+};
+
+/**
+ * 내부 포맷팅 처리 (concept 링크, 인라인 코드)
+ */
+const parseInnerFormatting = (
+    text: string,
+    options: {
+        inlineCodeClassName?: string;
+        textSpanClassName?: string;
+        conceptKeywordClassName?: string;
+        onConceptClick?: (keyword: string, event: React.MouseEvent) => void;
+        validKeywords?: string[]; // 유효한 키워드 목록 추가
+    },
     baseKey: string
 ): React.ReactNode[] => {
     const {
         inlineCodeClassName = '',
         textSpanClassName = '',
-        boldClassName = '',
-        italicClassName = '',
         conceptKeywordClassName = '',
-        onConceptClick
+        onConceptClick,
+        validKeywords = []
     } = options;
 
-    // concept 링크와 단순 키워드 먼저 처리
-    // 1. [keyword](concept:keyword) 형식
-    // 2. [keyword] 형식 (단순)
+    // concept 링크와 단순 키워드 처리
     const conceptLinkParts = text.split(/(\[[^\]]+\](?:\(concept:[^)]+\))?)/g);
     const elements: React.ReactNode[] = [];
 
@@ -313,31 +379,53 @@ const parseTextFormatting = (
         const simpleConceptMatch = part.match(/^\[([^\]]+)\]$/) && !part.includes('(concept:');
 
         if (fullConceptMatch) {
-            // 전체 concept 링크
+            // 전체 concept 링크 - 키워드 유효성 검증
             const [, displayText, keyword] = fullConceptMatch;
-            elements.push(
-                <span
-                    key={`${baseKey}-concept-${index}`}
-                    className={conceptKeywordClassName}
-                    onClick={(e) => onConceptClick?.(keyword, e)}
-                    style={{ cursor: 'pointer' }}
-                >
-                    {displayText}
-                </span>
-            );
+            const isValidKeyword = validKeywords.length === 0 || validKeywords.includes(keyword);
+
+            if (isValidKeyword) {
+                elements.push(
+                    <span
+                        key={`${baseKey}-concept-${index}`}
+                        className={conceptKeywordClassName}
+                        onClick={(e) => onConceptClick?.(keyword, e)}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        {displayText}
+                    </span>
+                );
+            } else {
+                // 유효하지 않은 키워드는 일반 텍스트로 처리
+                elements.push(
+                    <span key={`${baseKey}-invalid-concept-${index}`} className={textSpanClassName}>
+                        {displayText}
+                    </span>
+                );
+            }
         } else if (simpleConceptMatch) {
-            // 단순 [keyword] 형식
+            // 단순 [keyword] 형식 - 키워드 유효성 검증
             const keyword = part.slice(1, -1); // [ ] 제거
-            elements.push(
-                <span
-                    key={`${baseKey}-simple-concept-${index}`}
-                    className={conceptKeywordClassName}
-                    onClick={(e) => onConceptClick?.(keyword, e)}
-                    style={{ cursor: 'pointer' }}
-                >
-                    {keyword}
-                </span>
-            );
+            const isValidKeyword = validKeywords.length === 0 || validKeywords.includes(keyword);
+
+            if (isValidKeyword) {
+                elements.push(
+                    <span
+                        key={`${baseKey}-simple-concept-${index}`}
+                        className={conceptKeywordClassName}
+                        onClick={(e) => onConceptClick?.(keyword, e)}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        {keyword}
+                    </span>
+                );
+            } else {
+                // 유효하지 않은 키워드는 일반 텍스트로 처리
+                elements.push(
+                    <span key={`${baseKey}-invalid-simple-concept-${index}`} className={textSpanClassName}>
+                        {keyword}
+                    </span>
+                );
+            }
         } else {
             // 인라인 코드 처리 (`code`)
             const inlineCodeParts = part.split(/(`[^`]+`)/g);
@@ -351,63 +439,11 @@ const parseTextFormatting = (
                             {codeText}
                         </code>
                     );
-                } else {
-                    // 볼드/이탤릭 처리
-                    elements.push(...parseBoldItalic(codePart, {
-                        textSpanClassName,
-                        boldClassName,
-                        italicClassName
-                    }, `${baseKey}-${index}-${codeIndex}`));
-                }
-            });
-        }
-    });
-
-    return elements;
-};
-
-/**
- * 볼드와 이탤릭을 파싱 (개선된 정규식 사용)
- */
-const parseBoldItalic = (
-    text: string,
-    options: { textSpanClassName?: string; boldClassName?: string; italicClassName?: string },
-    baseKey: string
-): React.ReactNode[] => {
-    const { textSpanClassName = '', boldClassName = '', italicClassName = '' } = options;
-
-    // 볼드 처리 (**text**) - 수정된 정규식: 최소 1글자 이상 필요
-    const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
-    const elements: React.ReactNode[] = [];
-
-    boldParts.forEach((part, index) => {
-        if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-            // 볼드 텍스트 (최소 1글자는 있어야 함)
-            const boldText = part.slice(2, -2);
-            elements.push(
-                <strong key={`${baseKey}-bold-${index}`} className={boldClassName}>
-                    {boldText}
-                </strong>
-            );
-        } else {
-            // 이탤릭 처리 (*text*) - 볼드가 아닌 경우만
-            const italicParts = part.split(/(\*[^*]+\*)/g);
-
-            italicParts.forEach((italicPart, italicIndex) => {
-                if (italicPart.startsWith('*') && italicPart.endsWith('*') &&
-                    !italicPart.startsWith('**') && italicPart.length > 2) {
-                    // 이탤릭 텍스트 (최소 1글자는 있어야 함)
-                    const italicText = italicPart.slice(1, -1);
-                    elements.push(
-                        <em key={`${baseKey}-italic-${index}-${italicIndex}`} className={italicClassName}>
-                            {italicText}
-                        </em>
-                    );
-                } else if (italicPart) {
+                } else if (codePart) {
                     // 일반 텍스트
                     elements.push(
-                        <span key={`${baseKey}-text-${index}-${italicIndex}`} className={textSpanClassName}>
-                            {italicPart}
+                        <span key={`${baseKey}-text-${index}-${codeIndex}`} className={textSpanClassName}>
+                            {codePart}
                         </span>
                     );
                 }

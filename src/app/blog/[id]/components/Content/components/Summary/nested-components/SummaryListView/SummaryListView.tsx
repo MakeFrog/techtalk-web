@@ -39,7 +39,32 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
 
     // 전체 요약 생성 함수
     const handleGenerateFullSummary = useCallback(async () => {
-        if (blogState.status !== 'success') return;
+        console.log('🚨🚨🚨 [SummaryListView] ===== 요약 생성 시작 =====');
+
+        if (blogState.status !== 'success') {
+            console.log('❌ [SummaryListView] 블로그 상태가 success가 아님:', blogState.status);
+            return;
+        }
+
+        console.log('✅ [SummaryListView] 요약 생성 조건 확인 완료');
+        console.log('📋 [SummaryListView] 전송할 데이터:', {
+            title: blogState.data.title,
+            textLength: blogState.data.content.length,
+            tocLength: tocItems.length,
+            keywordsLength: keywords.length
+        });
+
+        // 키워드 상세 내용 출력
+        console.log('🔑 [SummaryListView] 키워드 상세 내용:');
+        keywords.forEach((keyword, index) => {
+            console.log(`   ${index + 1}. [${keyword.keyword}]: ${keyword.description}`);
+        });
+
+        // TOC 상세 내용 출력  
+        console.log('📋 [SummaryListView] TOC 상세 내용:');
+        tocItems.forEach((item, index) => {
+            console.log(`   ${index + 1}. ${item.title}`);
+        });
 
         reset(); // 이전 스트림 상태 초기화
 
@@ -115,20 +140,15 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         const processed = text
             // 제목 뒤의 빈 줄 제거 (## 제목\n\n- 리스트 -> ## 제목\n- 리스트)
             .replace(/^(#{1,6}.*)\n\n(-|\*)/gm, '$1\n$2')
-            // 코드 블록 전후의 과도한 빈 줄 제거
+            // 코드 블록 위의 줄바꿈 제거
             .replace(/\n\n```/g, '\n```')
+            .replace(/\n```/g, '\n```')
+            // 코드 블록 아래의 줄바꿈 제거
             .replace(/```\n\n/g, '```\n')
             // 연속된 빈 줄을 하나로 통합 (최대 2개 연속 \n만 허용)
             .replace(/\n{3,}/g, '\n\n')
             // 시작과 끝의 공백 제거
             .trim();
-
-        console.log('🔍 [마크다운 전처리]', {
-            원본길이: text.length,
-            처리후길이: processed.length,
-            원본샘플: text.substring(0, 200),
-            처리후샘플: processed.substring(0, 200)
-        });
 
         return processed;
     }, []);
@@ -139,6 +159,9 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
             // 전처리된 텍스트로 마크다운 파싱
             const preprocessedText = preprocessMarkdown(summaryState.content);
 
+            // 유효한 키워드 목록 생성 (실제 전달받은 키워드만)
+            const validKeywords = keywords.map(keyword => keyword.keyword);
+
             return parseMarkdown(preprocessedText, {
                 inlineCodeClassName: styles.inlineCode,
                 textSpanClassName: styles.textSpan,
@@ -148,10 +171,11 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
                 italicClassName: styles.italic,
                 conceptKeywordClassName: styles.conceptKeyword,
                 onConceptClick: handleConceptClick,
+                validKeywords: validKeywords, // 유효한 키워드 목록 전달
             });
         }
         return null;
-    }, [summaryState, handleConceptClick, preprocessMarkdown]);
+    }, [summaryState, handleConceptClick, preprocessMarkdown, keywords]);
 
     // 블로그 데이터 로딩 중이거나 에러인 경우
     if (blogState.status === 'loading') {

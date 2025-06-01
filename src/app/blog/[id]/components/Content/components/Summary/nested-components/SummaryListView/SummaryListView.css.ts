@@ -68,12 +68,22 @@ export const blockquote = style({
     paddingLeft: 16,
     marginLeft: 0,
     marginRight: 0,
+    marginTop: 16,
     marginBottom: 16,
     backgroundColor: '#f8f9ff',
-    padding: '12px 16px',
-    borderRadius: '0 4px 4px 0',
-    fontStyle: 'italic',
+    padding: '16px 20px',
+    borderRadius: '0 8px 8px 0',
+    fontStyle: 'normal',
     color: '#495057',
+    fontSize: '14px',
+    lineHeight: '1.6',
+    boxShadow: '0 2px 4px rgba(0, 123, 255, 0.1)',
+});
+
+// 인용문 내부의 강조 텍스트 스타일링
+globalStyle(`${blockquote} strong`, {
+    fontWeight: 700,
+    color: '#2c5aa0',
 });
 
 export const bold = style({

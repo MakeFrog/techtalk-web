@@ -35,9 +35,36 @@ export async function POST(request: NextRequest) {
     try {
         const { title, text, toc, keywords } = await request.json();
 
+        console.log('🔍 [Summary API] 요청 데이터:', {
+            title: title?.substring(0, 50),
+            textLength: text?.length,
+            tocLength: toc?.length,
+            keywordsLength: keywords?.length,
+            tocItems: toc?.slice(0, 3) // 첫 3개 목차 확인
+        });
+
         if (!title || !text) {
+            console.error('❌ [Summary API] 필수 데이터 누락:', { title: !!title, text: !!text });
             return NextResponse.json(
                 { error: '제목과 본문이 필요합니다.' },
+                { status: 400 }
+            );
+        }
+
+        // 목차가 없으면 요약 생성 중단
+        if (!toc || toc.length === 0) {
+            console.error('❌ [Summary API] 목차가 없어서 요약 생성 중단');
+            return NextResponse.json(
+                { error: '목차가 필요합니다.' },
+                { status: 400 }
+            );
+        }
+
+        // 키워드가 없으면 요약 생성 중단
+        if (!keywords || keywords.length === 0) {
+            console.error('❌ [Summary API] 키워드가 없어서 요약 생성 중단');
+            return NextResponse.json(
+                { error: '키워드가 필요합니다.' },
                 { status: 400 }
             );
         }
@@ -53,58 +80,90 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        // TOC를 문자열로 변환
-        const tocStr = toc && toc.length > 0
-            ? toc.map((item: any, index: number) => `${index + 1}. ${item.title || item}`).join('\n')
-            : '목차 없음';
-
-        // 키워드를 문자열로 변환
-        const keywordsStr = keywords && keywords.length > 0
-            ? keywords.map((k: any) => `- ${k.keyword}: ${k.description}`).join('\n')
-            : '프로그래밍 키워드 없음';
+        // TOC 데이터를 안전하게 처리 (문자열 배열 또는 객체 배열 모두 대응)
+        const tocTitles = toc.map((item: any, index: number) => {
+            // 이미 문자열인 경우
+            if (typeof item === 'string') {
+                return `${index + 1}. ${item}`;
+            }
+            // 객체인 경우 (TocItem 형태: {id, title})
+            if (typeof item === 'object' && item.title) {
+                return `${index + 1}. ${item.title}`;
+            }
+            // 예외 상황 처리
+            return `${index + 1}. ${String(item)}`;
+        });
 
         const summaryPrompt = `
-당신은 기술 블로그 전문 요약가로서, **전체 블로그 내용**을 체계적으로 요약해야 합니다.
+당신은 기술 블로그 전문 요약가로서, **제목, 원문, 목차, 프로그래밍 키워드**를 바탕으로 학습 최적화된 완전한 요약을 생성해야 합니다.
 
 ### 🎯 목표
-- 독자가 블로그 전체 내용을 체계적으로 학습할 수 있도록 완전한 요약을 제공합니다.
-- 제공된 목차를 기반으로 각 섹션별 핵심 내용을 정리합니다.
+- 전체 블로그 내용을 체계적으로 요약하여 독자가 핵심 내용을 쉽게 이해할 수 있도록 합니다.
+- 제공된 목차 구조를 정확히 따라 각 섹션별로 상세한 설명을 제공합니다.
 - 프로그래밍 개념에 대한 링크를 활용하여 연결성을 높입니다.
 
 ### ✅ 작성 규칙
-- 제공된 목차를 ## 헤더로 사용하여 섹션별로 구성합니다.
-- 각 섹션당 **불릿 2-8개**로 핵심 내용을 요약합니다.
-- 각 블릿은 1-2문장으로 구성되며, 서로 이어지는 문장으로 단계별 이해를 돕습니다.
-- 각 블릿은 **콜론( : )은 사용하지 않고**, 구분이 필요하면 **en-dot(.)** 또는 **괄호**를 사용합니다.
-- 하이라이트(\`\`)과 같은 마크다운 형식을 활용하여 가독성을 높입니다.
-- 코드 예시가 있는 경우 적절히 포함하되, 실제 글의 내용을 기반으로 합니다.
-- 각 블릿은 필요 시 \`\`\`css / \`\`\`ts 등의 언어에 적합한 코드 스니펫을 사용합니다.
-- 프로그래밍 개념이 언급될 때는 [개념명](concept:개념명) 형식으로 링크를 걸어줍니다.
-- 섹션 마지막에는 필요에 따라 다음 형식을 사용할 수 있습니다:
-   - 주의사항: \`> **⚠️ 주의** : (관련 내용)\` 형태로 강조
-   - 팁: \`> **💡 팁** : (관련 내용)\` 형태로 강조
-- **모든 문장은 평서형 '-다/한다' 어미로 끝냅니다.**
 
-### 📚 목차
-${tocStr}
+#### 📝 마크다운 형식
+- 각 목차는 \`## (이모지) (목차제목)\` 형식의 헤더로 시작합니다.
+- 목차 아래 내용은 \`- 항목\` 형식의 리스트로 구성합니다.
+- 프로그래밍 키워드는 반드시 \`[키워드]\` 형식으로 대괄호로 감쌉니다.
+- 중요한 개념은 **볼드**로 강조합니다.
+- 코드는 \`인라인 코드\` 형식을 사용합니다.
 
-### 🔑 프로그래밍 키워드
-${keywordsStr}
+#### 📋 내용 구성
+- 아래 제공된 목차 순서를 정확히 따라 모든 목차를 다뤄야 합니다.
+- 각 섹션은 3-7개의 핵심 포인트로 구성합니다.
+- 원문의 핵심 내용을 놓치지 않고 포함합니다.
+- 기술적 세부사항과 실용적 예시를 균형있게 다룹니다.
+- 학습자가 단계별로 이해할 수 있도록 논리적 순서를 유지합니다.
 
-### 📝 출력 형식
-마크다운 형식으로 전체 블로그의 완전한 요약을 반환해주세요. 추가 설명이나 주석은 포함하지 마세요.
+#### 🔗 키워드 연결
+- 프로그래밍 키워드 목록에 있는 개념들을 적극적으로 활용합니다.
+- 키워드는 정확한 용어로 \`[키워드]\` 형식으로 표기합니다.
+- 맥락에 맞게 자연스럽게 키워드를 삽입합니다.
 
 ### 📥 입력 데이터
-제목: ${title}
 
-원문:   
+**제목:** ${title}
+
+**📋 목차 (이 순서대로 섹션을 구성하세요):**
+${tocTitles.join('\n')}
+
+**🔑 프로그래밍 키워드 (적극 활용하세요):**
+${keywords && keywords.length > 0
+                ? keywords.map((keyword: { keyword: string; description: string }) => `- [${keyword.keyword}]: ${keyword.description}`).join('\n')
+                : '키워드가 제공되지 않았습니다.'
+            }
+
+**📄 원문:**
 ${text}
 
-### ⚠️ 중요
-- **전체 블로그 내용**을 목차별로 체계적으로 요약하세요.
-- 마크다운 형식의 완전한 요약 내용만 반환하세요.
-- 프로그래밍 개념 링크를 적극 활용하세요.
+### 📤 출력 형식
+위 목차 순서를 정확히 따라 구조화된 마크다운 형식으로 응답해주세요. 
+**모든 목차 항목을 빠뜨리지 말고 포함해야 합니다.**
+
+**예시 형식:**
+\`\`\`
+## 🎯 첫 번째 목차
+
+- [핵심키워드]는 **중요한 개념**으로서 시스템의 성능을 좌우합니다.
+- \`코드예시\`를 통해 실제 구현 방법을 확인할 수 있습니다.
+- [다른키워드]와의 연관성을 이해하는 것이 중요합니다.
+
+## 🚀 두 번째 목차
+
+- 실제 프로덕션 환경에서는 [관련기술]을 활용하여 문제를 해결합니다.
+- **모니터링**과 **로깅**을 통해 시스템 상태를 추적할 수 있습니다.
+\`\`\`
 `;
+
+        console.log('📋 [Summary API] 원본 목차:', toc);
+        console.log('📋 [Summary API] 처리된 목차:', tocTitles);
+        console.log('🔑 [Summary API] 사용된 키워드:', keywords.map((k: { keyword: string }) => k.keyword));
+
+        // 프롬프트 전문을 로그로 출력 (디버깅용)
+        console.log('📝 [Summary API] 생성된 프롬프트 전문:\n' + summaryPrompt);
 
         console.log('🚀 [Full Summary] 전체 요약 스트리밍 시작');
 

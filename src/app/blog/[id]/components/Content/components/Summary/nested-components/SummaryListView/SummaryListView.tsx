@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { parseMarkdown } from '@/utils/markdownParser';
 import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
 import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
 import { useToc } from '@/domains/blog/hooks/useToc';
 import { useKeywords } from '@/domains/blog/hooks/useKeywords';
-import { useSummaryStream, SummaryStreamState } from '@/domains/blog/hooks/useSummaryStream';
-import { ProgrammingKeyword } from '../../types/keywordTypes';
+import { useSummaryStream } from '@/domains/blog/hooks/useSummaryStream';
+import { TocItem } from '../../types/tocTypes';
 import * as styles from './SummaryListView.css';
 
 interface PopupState {
@@ -17,7 +17,11 @@ interface PopupState {
     position: { x: number; y: number };
 }
 
-const SummaryListViewComponent = () => {
+interface SummaryListViewProps {
+    onTocReady?: (tocItems: TocItem[]) => void;
+}
+
+const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }) => {
     const { state: blogState } = useBlogBasicInfo();
     const { tocItems, generateToc } = useToc();
     const { keywords, extractKeywords } = useKeywords();
@@ -33,12 +37,33 @@ const SummaryListViewComponent = () => {
     const [isDataReady, setIsDataReady] = useState(false);
     const [hasStartedSummary, setHasStartedSummary] = useState(false);
 
+    // 전체 요약 생성 함수
+    const handleGenerateFullSummary = useCallback(async () => {
+        if (blogState.status !== 'success') return;
+
+        reset(); // 이전 스트림 상태 초기화
+
+        await startStreaming({
+            title: blogState.data.title,
+            text: blogState.data.content,
+            toc: tocItems,
+            keywords
+        });
+    }, [blogState, reset, startStreaming, tocItems, keywords]);
+
     // 블로그 데이터가 로드되면 TOC 생성
     useEffect(() => {
         if (blogState.status === 'success' && tocItems.length === 0) {
             generateToc(blogState.data.title, blogState.data.content);
         }
     }, [blogState, tocItems.length, generateToc]);
+
+    // TOC가 생성되면 상위 컴포넌트에 전달
+    useEffect(() => {
+        if (tocItems.length > 0 && onTocReady) {
+            onTocReady(tocItems);
+        }
+    }, [tocItems, onTocReady]);
 
     // 블로그 데이터가 로드되면 키워드 추출
     useEffect(() => {
@@ -60,22 +85,9 @@ const SummaryListViewComponent = () => {
             setHasStartedSummary(true);
             handleGenerateFullSummary();
         }
-    }, [isDataReady, blogState.status, hasStartedSummary]);
+    }, [isDataReady, blogState.status, hasStartedSummary, handleGenerateFullSummary]);
 
-    const handleGenerateFullSummary = async () => {
-        if (blogState.status !== 'success') return;
-
-        reset(); // 이전 스트림 상태 초기화
-
-        await startStreaming({
-            title: blogState.data.title,
-            text: blogState.data.content,
-            toc: tocItems,
-            keywords
-        });
-    };
-
-    const handleConceptClick = (keyword: string, event: React.MouseEvent) => {
+    const handleConceptClick = useCallback((keyword: string, event: React.MouseEvent) => {
         event.preventDefault();
 
         // 키워드 목록에서 해당 키워드의 설명 찾기
@@ -92,11 +104,11 @@ const SummaryListViewComponent = () => {
                 }
             });
         }
-    };
+    }, [keywords]);
 
-    const handleClosePopup = () => {
+    const handleClosePopup = useCallback(() => {
         setPopupState(prev => ({ ...prev, isVisible: false }));
-    };
+    }, []);
 
     // 마크다운 파싱을 메모이제이션
     const parsedContent = useMemo(() => {
@@ -113,7 +125,7 @@ const SummaryListViewComponent = () => {
             });
         }
         return null;
-    }, [summaryState]);
+    }, [summaryState, handleConceptClick]);
 
     // 블로그 데이터 로딩 중이거나 에러인 경우
     if (blogState.status === 'loading') {

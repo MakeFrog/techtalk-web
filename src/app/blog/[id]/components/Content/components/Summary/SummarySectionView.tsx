@@ -4,22 +4,30 @@ import { Gap } from "@/components/gap/Gap";
 import { TableOfContentsView } from "./nested-components/TableOfContents/TableOfContentsView";
 import { SummaryListView } from "./nested-components/SummaryListView/SummaryListView";
 import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
+import { useState } from "react";
+import { TocItem } from "./types/tocTypes";
 
 export const SummarySectionView = () => {
     const { state } = useBlogBasicInfo();
+    const [tocItems, setTocItems] = useState<TocItem[]>([]);
 
-    // 로딩 중이거나 에러인 경우 빈 props로 전달 (TableOfContentsView에서 자체 로딩 처리)
-    const blogTitle = state.status === 'success' ? state.data.title : '';
-    const blogContent = state.status === 'success' ? state.data.content : '';
+    const handleTocReady = (items: TocItem[]) => {
+        setTocItems(items);
+    };
+
+    // 블로그 상태에 따른 로딩/에러 상태 계산
+    const isLoading = state.status === 'loading';
+    const error = state.status === 'error' ? state.error : undefined;
 
     return (
         <div>
             <TableOfContentsView
-                blogTitle={blogTitle}
-                blogContent={blogContent}
+                tocItems={tocItems}
+                isLoading={isLoading}
+                error={error}
             />
             <Gap size={24} />
-            <SummaryListView />
+            <SummaryListView onTocReady={handleTocReady} />
         </div>
     );
 };      

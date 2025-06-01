@@ -1,26 +1,20 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { container, title, orderedList, listItem, linkAnchor, loadingState, errorState } from "./TabOfContentView.css";
-import { useToc } from "@/domains/blog/hooks/useToc";
+import { TocItem } from "../../types/tocTypes";
 
 interface TableOfContentsViewProps {
-    blogTitle: string;
-    blogContent: string;
+    tocItems?: TocItem[];
+    isLoading?: boolean;
+    error?: string;
 }
 
 const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
-    blogTitle,
-    blogContent
+    tocItems = [],
+    isLoading = false,
+    error
 }) => {
-    const { tocItems, isLoading, error, generateToc } = useToc();
-
-    useEffect(() => {
-        if (blogTitle && blogContent) {
-            generateToc(blogTitle, blogContent);
-        }
-    }, [blogTitle, blogContent, generateToc]);
-
     const generateAnchorId = (tocTitle: string, id: number): string => {
         return `section-${id}`;
     };
@@ -78,7 +72,7 @@ const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
 
     return (
         <div className={container}>
-            <h2 className={title}>Table of Contents</h2>
+            <h2 className={title}>목차</h2>
             <ol className={orderedList}>
                 {tocItems.map((item) => {
                     const anchorId = generateAnchorId(item.title, item.id);

@@ -135,14 +135,82 @@ const parseInlineElements = (
         onConceptClick
     } = options;
 
-    // 줄 단위로 분리하여 인용문 처리
+    // 줄 단위로 분리하여 각종 블록 요소 처리
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
 
     lines.forEach((line, lineIndex) => {
+        const trimmedLine = line.trim();
+
+        // 제목 처리 (## , ### 등)
+        const headingMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
+        if (headingMatch) {
+            const [, hashes, titleText] = headingMatch;
+            const level = hashes.length;
+            const HeadingTag = `h${level}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+
+            elements.push(
+                React.createElement(HeadingTag, {
+                    key: `heading-${baseKey}-${lineIndex}`,
+                    style: {
+                        fontSize: level === 1 ? '1.8rem' : level === 2 ? '1.5rem' : level === 3 ? '1.3rem' : '1.1rem',
+                        fontWeight: 'bold',
+                        margin: '20px 0 12px 0',
+                        lineHeight: '1.4',
+                        color: '#1a1a1a'
+                    }
+                }, parseTextFormatting(titleText, {
+                    inlineCodeClassName,
+                    textSpanClassName,
+                    boldClassName,
+                    italicClassName,
+                    conceptKeywordClassName,
+                    onConceptClick
+                }, `${baseKey}-heading-${lineIndex}`))
+            );
+        }
+        // 리스트 아이템 처리 (- 또는 * 로 시작)
+        else if (trimmedLine.match(/^[-*]\s+/)) {
+            const listText = trimmedLine.replace(/^[-*]\s+/, '');
+            elements.push(
+                <div
+                    key={`list-item-${baseKey}-${lineIndex}`}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        margin: '8px 0',
+                        paddingLeft: '16px',
+                        position: 'relative'
+                    }}
+                >
+                    <span
+                        style={{
+                            position: 'absolute',
+                            left: '0',
+                            top: '0.5em',
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            backgroundColor: '#666',
+                            marginTop: '-3px'
+                        }}
+                    />
+                    <span style={{ flex: 1 }}>
+                        {parseTextFormatting(listText, {
+                            inlineCodeClassName,
+                            textSpanClassName,
+                            boldClassName,
+                            italicClassName,
+                            conceptKeywordClassName,
+                            onConceptClick
+                        }, `${baseKey}-list-${lineIndex}`)}
+                    </span>
+                </div>
+            );
+        }
         // 인용문 처리 (> 로 시작하는 줄)
-        if (line.trim().startsWith('> ')) {
-            const quoteText = line.replace(/^>\s*/, '');
+        else if (trimmedLine.startsWith('> ')) {
+            const quoteText = trimmedLine.replace(/^>\s*/, '');
             elements.push(
                 <blockquote key={`quote-${baseKey}-${lineIndex}`} className={blockquoteClassName}>
                     {parseTextFormatting(quoteText, {
@@ -155,10 +223,15 @@ const parseInlineElements = (
                     }, `${baseKey}-${lineIndex}`)}
                 </blockquote>
             );
-        } else if (line.trim()) {
-            // 일반 텍스트 처리
+        }
+        // 빈 줄 처리
+        else if (!trimmedLine) {
+            elements.push(<br key={`br-${baseKey}-${lineIndex}`} />);
+        }
+        // 일반 텍스트 처리
+        else {
             elements.push(
-                <div key={`text-${baseKey}-${lineIndex}`}>
+                <div key={`text-${baseKey}-${lineIndex}`} style={{ margin: '8px 0', lineHeight: '1.6' }}>
                     {parseTextFormatting(line, {
                         inlineCodeClassName,
                         textSpanClassName,
@@ -169,11 +242,6 @@ const parseInlineElements = (
                     }, `${baseKey}-${lineIndex}`)}
                 </div>
             );
-        }
-
-        // 줄바꿈 추가 (마지막 줄 제외)
-        if (lineIndex < lines.length - 1) {
-            elements.push(<br key={`br-${baseKey}-${lineIndex}`} />);
         }
     });
 
@@ -197,16 +265,21 @@ const parseTextFormatting = (
         onConceptClick
     } = options;
 
-    // concept 링크 먼저 처리 ([keyword](concept:keyword))
-    const conceptLinkParts = text.split(/(\[[^\]]+\]\(concept:[^)]+\))/g);
+    // concept 링크와 단순 키워드 먼저 처리
+    // 1. [keyword](concept:keyword) 형식
+    // 2. [keyword] 형식 (단순)
+    const conceptLinkParts = text.split(/(\[[^\]]+\](?:\(concept:[^)]+\))?)/g);
     const elements: React.ReactNode[] = [];
 
     conceptLinkParts.forEach((part, index) => {
-        const conceptMatch = part.match(/\[([^\]]+)\]\(concept:([^)]+)\)/);
+        // [keyword](concept:keyword) 형식 매칭
+        const fullConceptMatch = part.match(/\[([^\]]+)\]\(concept:([^)]+)\)/);
+        // [keyword] 형식 매칭 (뒤에 (concept:...)가 없는 경우)
+        const simpleConceptMatch = part.match(/^\[([^\]]+)\]$/) && !part.includes('(concept:');
 
-        if (conceptMatch) {
-            // concept 링크
-            const [, displayText, keyword] = conceptMatch;
+        if (fullConceptMatch) {
+            // 전체 concept 링크
+            const [, displayText, keyword] = fullConceptMatch;
             elements.push(
                 <span
                     key={`${baseKey}-concept-${index}`}
@@ -215,6 +288,19 @@ const parseTextFormatting = (
                     style={{ cursor: 'pointer' }}
                 >
                     {displayText}
+                </span>
+            );
+        } else if (simpleConceptMatch) {
+            // 단순 [keyword] 형식
+            const keyword = part.slice(1, -1); // [ ] 제거
+            elements.push(
+                <span
+                    key={`${baseKey}-simple-concept-${index}`}
+                    className={conceptKeywordClassName}
+                    onClick={(e) => onConceptClick?.(keyword, e)}
+                    style={{ cursor: 'pointer' }}
+                >
+                    {keyword}
                 </span>
             );
         } else {

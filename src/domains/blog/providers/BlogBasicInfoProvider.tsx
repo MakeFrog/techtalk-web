@@ -57,25 +57,26 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
         let isCancelled = false;
 
         async function loadBlogContent() {
-            const startTime = performance.now();
-            console.log('📚 [BlogBasicInfoProvider] 데이터 로딩 시작:', documentId, `(시작 시간: ${startTime.toFixed(2)}ms)`);
+            const startTime = Date.now();
+            console.log('📚 [BlogBasicInfoProvider] 🚀 로딩 시작:', documentId);
             setState({ status: 'loading' });
 
             try {
                 // 병렬로 메타데이터와 콘텐츠 로딩
-                const blogDocRef = doc(firestore, 'Blogs', documentId);
-                const contentDocRef = doc(firestore, 'Blogs', documentId, 'Content', 'content');
+                const blogRef = doc(firestore, 'Blogs', documentId);
+                const contentRef = doc(firestore, 'Blogs', documentId, 'Content', 'content');
 
-                console.log('📚 [BlogBasicInfoProvider] 메타데이터 가져오기 시작:', blogDocRef.path);
-                const metadataStart = performance.now();
+                console.log('📚 [BlogBasicInfoProvider] 메타데이터 가져오기 시작:', blogRef.path);
+                const metadataStart = Date.now();
 
                 const [blogDoc, contentDoc] = await Promise.all([
-                    getDoc(blogDocRef),
-                    getDoc(contentDocRef)
+                    getDoc(blogRef),
+                    getDoc(contentRef)
                 ]);
 
-                const metadataEnd = performance.now();
-                console.log('📚 [BlogBasicInfoProvider] Firestore 조회 완료:', `${(metadataEnd - metadataStart).toFixed(2)}ms`);
+                const metadataEnd = Date.now();
+                const metadataTime = metadataEnd - metadataStart;
+                console.log('📚 [BlogBasicInfoProvider] 메타데이터 로딩 완료:', `${metadataTime}ms`);
                 console.log('📚 [BlogBasicInfoProvider] 메타데이터 로딩 완료:', blogDoc.exists());
                 console.log('📚 [BlogBasicInfoProvider] 콘텐츠 로딩 완료:', contentDoc.exists());
 
@@ -114,14 +115,14 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
 
                 setState({ status: 'success', data });
 
-                const endTime = performance.now();
+                const endTime = Date.now();
                 const totalTime = endTime - startTime;
                 console.log('📚 [BlogBasicInfoProvider] 🚀 전체 로딩 완료:', {
                     title: data.title,
                     contentLength: data.content.length,
                     techSetsCount: data.skillIds.length + data.jobGroupIds.length,
                     hasThumbnail: !!data.thumbnailUrl,
-                    totalLoadingTime: `${totalTime.toFixed(2)}ms` // 🎯 핵심 성능 지표
+                    totalLoadingTime: `${totalTime}ms` // 성능 지표
                 });
 
             } catch (error) {

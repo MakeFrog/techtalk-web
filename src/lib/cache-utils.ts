@@ -86,8 +86,8 @@ class MemoryCache {
 // 싱글톤 인스턴스
 export const memoryCache = new MemoryCache();
 
-// 정기적으로 만료된 캐시 정리 (5분마다)
-if (typeof window !== 'undefined') {
+// 정기적으로 만료된 캐시 정리 (5분마다) - 클라이언트에서만 실행
+if (typeof window !== 'undefined' && typeof setInterval !== 'undefined') {
     setInterval(() => {
         memoryCache.cleanup();
     }, 5 * 60 * 1000);

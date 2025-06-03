@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "../styles/globals.css";
 import { TechSetCacheProvider } from "@/components/providers/TechSetCacheProvider";
@@ -22,20 +22,23 @@ export const metadata: Metadata = {
   }
 };
 
+// 모바일 디바이스 최적화를 위한 viewport 설정
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // 모바일에서 줌 방지로 레이아웃 안정성 향상
+  viewportFit: 'cover',
+};
+
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html
-      lang="en"
-      style={{ colorScheme: 'light only' }}
-    >
-      <body
-        className={`${geistSans.variable} ${geistMono.variable}`}
-        suppressHydrationWarning={true}
-      >
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <TechSetCacheProvider>
           {children}
         </TechSetCacheProvider>

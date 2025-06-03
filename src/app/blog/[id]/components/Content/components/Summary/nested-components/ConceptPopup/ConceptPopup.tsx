@@ -34,6 +34,11 @@ export const ConceptPopup: React.FC<ConceptPopupProps> = ({
 
     // ESC 키 핸들러
     useEffect(() => {
+        // 브라우저 환경에서만 실행
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 handleClose();
@@ -41,7 +46,11 @@ export const ConceptPopup: React.FC<ConceptPopupProps> = ({
         };
 
         document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
+        return () => {
+            if (typeof document !== 'undefined') {
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
     }, []);
 
     const handleClose = () => {

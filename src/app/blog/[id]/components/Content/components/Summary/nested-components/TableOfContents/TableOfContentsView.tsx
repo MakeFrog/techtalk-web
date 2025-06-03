@@ -22,6 +22,11 @@ const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
     const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, anchorId: string) => {
         e.preventDefault();
 
+        // 브라우저 환경에서만 실행
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
         const targetElement = document.getElementById(anchorId);
 
         if (targetElement) {
@@ -30,8 +35,6 @@ const TableOfContentsComponent: React.FC<TableOfContentsViewProps> = ({
                 block: 'start',
                 inline: 'nearest'
             });
-
-
         } else {
             console.warn(`⚠️ [TOC] 앵커 요소를 찾을 수 없습니다: ${anchorId}`);
         }

@@ -3,7 +3,7 @@
 import { Gap } from "@/components/gap/Gap.tsx";
 import ContentHeader from "./components/ContentHeader/ContentHeader.tsx";
 import { InsightSectionView } from "./components/Insight/InsightSectionView.tsx";
-import { container } from "./Content.css.ts";
+import { container, loadingContainer, errorContainer, errorDetailText } from "./Content.css.ts";
 import { QuestionSectionView } from "./components/Question/QuestionSectionView.tsx";
 import { SummarySectionView } from "./components/Summary/SummarySectionView.tsx";
 import { useInsightStream } from "@/domains/blog/hooks/useInsightStream";
@@ -39,14 +39,7 @@ export default function Content() {
     if (state.status === 'loading') {
         return (
             <section className={container}>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '200px',
-                    color: '#64748b',
-                    fontSize: '14px'
-                }}>
+                <div className={loadingContainer}>
                     {/* 블로그 데이터를 로딩 중입니다... */}
                 </div>
             </section>
@@ -57,19 +50,10 @@ export default function Content() {
     if (state.status === 'error') {
         return (
             <section className={container}>
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '200px',
-                    color: '#ef4444',
-                    fontSize: '14px',
-                    gap: '8px'
-                }}>
+                <div className={errorContainer}>
                     <span>⚠️</span>
                     <span>블로그 로딩 중 오류가 발생했습니다.</span>
-                    <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                    <span className={errorDetailText}>
                         {state.error}
                     </span>
                 </div>

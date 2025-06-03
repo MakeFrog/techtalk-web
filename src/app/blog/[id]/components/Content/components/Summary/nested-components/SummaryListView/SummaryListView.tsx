@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { parseMarkdown } from '@/utils/markdownParser';
+import { MarkdownPreprocessor } from '@/utils/markdownPreprocessor';
 import { ConceptPopup } from '../ConceptPopup/ConceptPopup';
 import { LoadingSpinner } from '@/components/loading/LoadingSpinner/LoadingSpinner';
 import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
@@ -70,50 +71,17 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
         setPopupState(prev => ({ ...prev, isVisible: false }));
     }, []);
 
-    // 마크다운 텍스트 전처리 함수 - 불필요한 공백 제거
-    const preprocessMarkdown = useCallback((text: string): string => {
-        let processed = text;
-
-        // 전체 텍스트가 ```markdown으로 감싸져 있는 경우 제거
-        if (processed.startsWith('```markdown') && processed.endsWith('```')) {
-            console.log('🔧 [SummaryListView] 마크다운 코드 블록 감싸기 제거');
-            processed = processed
-                .replace(/^```markdown\s*\n?/, '') // 시작 부분 제거
-                .replace(/\n?\s*```$/, ''); // 끝 부분 제거
-        }
-
-        // 전체 텍스트가 ```으로만 감싸져 있는 경우도 제거 (언어 명시 없이)
-        if (processed.startsWith('```') && processed.endsWith('```') && !processed.includes('\n```')) {
-            console.log('🔧 [SummaryListView] 일반 코드 블록 감싸기 제거');
-            processed = processed
-                .replace(/^```\s*\n?/, '') // 시작 부분 제거
-                .replace(/\n?\s*```$/, ''); // 끝 부분 제거
-        }
-
-        // 기존 전처리 로직
-        processed = processed
-            // 제목 뒤의 빈 줄 제거 (## 제목\n\n- 리스트 -> ## 제목\n- 리스트)
-            .replace(/^(#{1,6}.*)\n\n(-|\*)/gm, '$1\n$2')
-            // 코드 블록 위의 줄바꿈 제거
-            .replace(/\n\n```/g, '\n```')
-            .replace(/\n```/g, '\n```')
-            // 코드 블록 아래의 줄바꿈 제거
-            .replace(/```\n\n/g, '```\n')
-            // 연속된 빈 줄을 하나로 통합 (최대 2개 연속 \n만 허용)
-            .replace(/\n{3,}/g, '\n\n')
-            // 시작과 끝의 공백 제거
-            .trim();
-
-        return processed;
-    }, []);
-
     // 마크다운 파싱을 메모이제이션
     const parsedContent = useMemo(() => {
         // 스트리밍 중이거나 완료된 상태에서 summary가 있으면 파싱
         if (analyzedState.summary &&
             (analyzedState.fieldStatus.summary === 'loading' || analyzedState.fieldStatus.summary === 'completed')) {
-            // 전처리된 텍스트로 마크다운 파싱
-            const preprocessedText = preprocessMarkdown(analyzedState.summary);
+
+            // 마크다운 전처리 - 유틸리티 클래스 사용
+            const preprocessedText = MarkdownPreprocessor.preprocessWithLog(
+                analyzedState.summary,
+                'SummaryListView'
+            );
 
             // 유효한 키워드 목록 생성 (실제 전달받은 키워드만)
             const validKeywords = analyzedState.programming_keywords?.map(keyword => keyword.keyword) || [];
@@ -131,7 +99,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
             });
         }
         return null;
-    }, [analyzedState.summary, analyzedState.fieldStatus.summary, analyzedState.programming_keywords, handleConceptClick, preprocessMarkdown]);
+    }, [analyzedState.summary, analyzedState.fieldStatus.summary, analyzedState.programming_keywords, handleConceptClick]);
 
     // 블로그 데이터 로딩 중이거나 에러인 경우
     if (blogState.status === 'loading') {

@@ -1,5 +1,5 @@
 import { style, globalStyle, keyframes } from '@vanilla-extract/css';
-import { textStyles } from '@/styles/TextStyles';
+import { textStyles } from '@/styles/textStyles';
 
 // 스핀 애니메이션 (레거시 지원용)
 const spin = keyframes({

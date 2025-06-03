@@ -9,6 +9,7 @@ interface BlogBasicInfoData {
     title: string;
     content: string;
     thumbnailUrl?: string;
+    linkUrl?: string;
     skillIds: string[];
     jobGroupIds: string[];
 }
@@ -38,6 +39,7 @@ const BlogBasicInfoContext = createContext<BlogBasicInfoContextValue | null>(nul
 interface BlogFirestoreData {
     title: string;
     thumbnail_url?: string;
+    link_url?: string;
     related_skill_ids?: string[];
     related_job_group_ids?: string[];
 }
@@ -109,6 +111,7 @@ export function BlogBasicInfoProvider({ children, documentId }: BlogBasicInfoPro
                     title: blogData.title,
                     content,
                     thumbnailUrl: blogData.thumbnail_url,
+                    linkUrl: blogData.link_url,
                     skillIds: blogData.related_skill_ids || [],
                     jobGroupIds: blogData.related_job_group_ids || []
                 };

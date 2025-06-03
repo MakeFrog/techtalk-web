@@ -1,5 +1,5 @@
 import { style, globalStyle } from "@vanilla-extract/css";
-import { textStyles } from "@/styles/TextStyles";
+import { textStyles } from "@/styles/textStyles";
 
 // 부드러운 스크롤을 위한 글로벌 스타일
 globalStyle('html', {
@@ -37,7 +37,6 @@ export const linkAnchor = style({
     transition: 'all 0.2s ease',
     ':hover': {
         color: '#2937C7',
-        textDecoration: 'underline',
         transform: 'translateX(4px)',
     },
     ':focus': {

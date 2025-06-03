@@ -12,18 +12,58 @@ body {
     color-scheme: light only;
 }
 
+/* 모바일 웹뷰 최적화 - 좌우 스크롤 방지 */
+html {
+    overflow-x: hidden !important;
+    width: 100%;
+}
+
 body {
     color: var(--foreground);
     background: var(--background);
     font-family: Arial, Helvetica, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    width: 100%;
+    overflow-x: hidden !important;
+    position: relative;
 }
 
 * {
     box-sizing: border-box;
     padding: 0;
     margin: 0;
+}
+
+/* 모든 요소의 최대 너비 제한 */
+*:not(html):not(body) {
+    max-width: 100%;
+}
+
+/* 이미지와 미디어 요소의 반응형 처리 */
+img,
+video,
+iframe,
+embed,
+object {
+    max-width: 100%;
+    height: auto;
+}
+
+/* pre, code 블록의 overflow 처리 */
+pre,
+code {
+    overflow-x: auto;
+    max-width: 100%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* 테이블의 반응형 처리 */
+table {
+    width: 100%;
+    table-layout: fixed;
+    word-wrap: break-word;
 }
 
 a {

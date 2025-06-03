@@ -1,6 +1,6 @@
-import { textStyles } from '@/styles/TextStyles';
 import { style } from '@vanilla-extract/css';
 import { SizeConfig } from '@/styles/sizeConfig';
+import { textStyles } from '@/styles/textStyles';
 
 export const title = style({
     // 모바일 기본 스타일 (headline1)

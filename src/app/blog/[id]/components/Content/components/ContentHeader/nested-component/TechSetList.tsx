@@ -95,7 +95,7 @@ export const TechSetList = React.memo(function TechSetList({ skillIds, jobGroupI
                 gap: 6,
                 flexWrap: 'wrap',
                 paddingTop: (skillIds.length + jobGroupIds.length > 0) ? 12 : 0,
-                paddingBottom: (skillIds.length + jobGroupIds.length > 0) ? 20 : 0
+                paddingBottom: 20
             }}>
                 {/* 로딩 중일 때는 ID를 그대로 표시 */}
                 {[...skillIds, ...jobGroupIds].map((id, idx) => (
@@ -113,7 +113,7 @@ export const TechSetList = React.memo(function TechSetList({ skillIds, jobGroupI
             gap: 6,
             flexWrap: 'wrap',
             paddingTop: mappedTechSets.length > 0 ? 12 : 0,
-            paddingBottom: mappedTechSets.length > 0 ? 20 : 0
+            paddingBottom: 20
         }}>
             {mappedTechSets.map((techSet, idx) => (
                 <RoundedOutlinedChip key={techSet.id + idx}>

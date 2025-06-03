@@ -5,6 +5,7 @@ import { title } from "./ContentHeader.css";
 import { TechSetList } from './nested-component/TechSetList';
 import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
 import { ThumbnailImage } from '@/components/Image/Thumbnail/ThumbnailImage';
+import { isMobileDevice } from '@/utils/clientUtils';
 
 export default function ContentHeader() {
     const { state } = useBlogBasicInfo();
@@ -37,6 +38,10 @@ export default function ContentHeader() {
         console.log('🖼️ [ContentHeader] 썸네일 URL 발견:', thumbnailUrl);
     }
 
+    // 모바일 여부에 따라 aspectRatio 결정
+    const isMobile = isMobileDevice();
+    const aspectRatio = isMobile ? "16/8.5" : "12/6";
+
     return (
         <div>
             <h1 className={title}>{blogTitle}</h1>
@@ -47,7 +52,7 @@ export default function ContentHeader() {
                 <ThumbnailImage
                     src={thumbnailUrl}
                     alt={blogTitle}
-                    aspectRatio="12/6"
+                    aspectRatio={aspectRatio}
                     borderRadius={12}
                     style={{ marginBottom: '20px' }}
                 />

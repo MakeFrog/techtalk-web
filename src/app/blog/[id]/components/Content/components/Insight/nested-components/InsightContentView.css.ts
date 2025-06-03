@@ -1,4 +1,4 @@
-import { textStyles } from '@/styles/TextStyles';
+import { textStyles } from '@/styles/textStyles';
 import { style, globalStyle } from '@vanilla-extract/css';
 import { SizeConfig } from '@/styles/sizeConfig';
 
@@ -18,7 +18,7 @@ export const contentContainer = style({
     position: 'relative',
     overflow: 'hidden',
 
-    // 모바일/웹뷰에서 여백 줄이기
+    // 모바일/웹뷰에서 여백 줄이기  
     '@media': {
         [`screen and (max-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
             padding: '12px 16px',

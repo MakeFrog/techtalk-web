@@ -10,6 +10,9 @@ export const container = style({
     boxSizing: 'border-box',
     paddingLeft: '16px',
     paddingRight: '16px',
+    overflowX: 'hidden',
+    overflowWrap: 'break-word',
+    wordBreak: 'break-word',
     // '@media': {
     //     [`screen and (min-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
     //         paddingLeft: '6.67vw',

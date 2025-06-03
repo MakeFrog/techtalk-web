@@ -111,7 +111,7 @@ export const parseMarkdown = (
         if (codePart !== undefined) {
             const codeLanguage = language || 'text';
             elements.push(
-                <div key={`codeblock-${elements.length}`} className={codeBlockClassName} style={{ margin: 0 }}>
+                <div key={`codeblock-${elements.length}`} className={codeBlockClassName} style={{ margin: 0, maxWidth: '100%', overflow: 'hidden' }}>
                     <SyntaxHighlighter
                         language={codeLanguage}
                         style={oneDark}
@@ -120,12 +120,19 @@ export const parseMarkdown = (
                             padding: '16px',
                             borderRadius: '8px',
                             fontSize: '14px',
+                            maxWidth: '100%',
+                            overflow: 'auto',
+                            wordWrap: 'break-word',
+                            whiteSpace: 'pre-wrap',
                         }}
                         codeTagProps={{
                             style: {
                                 fontFamily: 'SF Mono, Monaco, Inconsolata, Roboto Mono, monospace',
+                                wordWrap: 'break-word',
+                                whiteSpace: 'pre-wrap',
                             }
                         }}
+                        wrapLongLines={true}
                     >
                         {codePart.trim()}
                     </SyntaxHighlighter>

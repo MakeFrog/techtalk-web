@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { textStyles } from '@/styles/TextStyles';
+import { textStyles } from '@/styles/textStyles';
 
 export const chip = style({
     display: 'inline-flex',

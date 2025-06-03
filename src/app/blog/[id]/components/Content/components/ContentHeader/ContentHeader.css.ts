@@ -1,6 +1,15 @@
-import { style } from '@vanilla-extract/css';
 import { textStyles } from '@/styles/TextStyles';
+import { style } from '@vanilla-extract/css';
+import { SizeConfig } from '@/styles/sizeConfig';
 
 export const title = style({
-    ...textStyles.headline1Web,
-}); 
+    // 모바일 기본 스타일 (headline1)
+    ...textStyles.headline1,
+
+    // 웹 화면에서는 headline1Web 사용
+    '@media': {
+        [`screen and (min-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
+            ...textStyles.headline1Web,
+        },
+    },
+});     

@@ -7,6 +7,20 @@ const spin = keyframes({
     '100%': { transform: 'rotate(360deg)' }
 });
 
+// 답변 영역 확장 애니메이션
+const expandAnimation = keyframes({
+    '0%': {
+        opacity: '0',
+        maxHeight: '0',
+        transform: 'translateY(-10px)',
+    },
+    '100%': {
+        opacity: '1',
+        maxHeight: '1000px',
+        transform: 'translateY(0)',
+    }
+});
+
 // 레거시 스피너 클래스 (하위 호환성)
 export const spinner = style({
     display: 'inline-block',
@@ -51,32 +65,46 @@ export const orderedList = style({
     margin: '0',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px', // 아이템 간 간격 더 줄임
+    gap: '8px',
 });
 
-// 개별 질문 아이템 스타일 (컴팩트하고 현대적인 디자인)
+// 개별 질문 아이템 스타일 (클릭 가능하도록 개선)
 export const listItem = style({
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '8px', // 번호와 질문 사이 간격
-    padding: '14px 16px', // 패딩 줄임
     backgroundColor: '#ffffff',
-    borderRadius: '10px',
+    borderRadius: '12px',
     border: '1px solid #e5e7eb',
     marginBottom: '0',
-    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+    overflow: 'hidden',
 
-    // 호버 효과 개선
+    // 호버 효과
     ':hover': {
-        backgroundColor: '#f8fafc',
         borderColor: '#c7d2fe',
         transform: 'translateY(-1px)',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
     },
 });
 
-// 질문 번호 스타일 (하이라이트된 일반 번호)
+// 질문 헤더 (클릭 가능한 영역)
+export const questionHeader = style({
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '16px 18px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+
+    ':hover': {
+        backgroundColor: '#f8fafc',
+    },
+
+    ':active': {
+        backgroundColor: '#f1f5f9',
+    },
+});
+
+// 질문 번호 스타일
 export const questionNumber = style({
     ...textStyles.body1,
     color: '#6366f1',
@@ -84,8 +112,8 @@ export const questionNumber = style({
     fontSize: '14px',
     minWidth: 'auto',
     flexShrink: 0,
-    marginTop: '1px', // 텍스트와 정렬 맞춤
-    marginRight: '2px', // 점과의 간격
+    marginTop: '1px',
+    marginRight: '2px',
     selectors: {
         '&::after': {
             content: '"."',
@@ -101,6 +129,64 @@ export const questionContent = style({
     color: '#374151',
     letterSpacing: '-0.01em',
     lineHeight: '1.65',
+});
+
+// 토글 아이콘 컨테이너
+export const toggleIcon = style({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '24px',
+    height: '24px',
+    borderRadius: '6px',
+    backgroundColor: '#f1f5f9',
+    color: '#6366f1',
+    fontSize: '14px',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    flexShrink: 0,
+    marginTop: '1px',
+});
+
+// 토글 아이콘 (확장된 상태)
+export const toggleIconExpanded = style({
+    transform: 'rotate(180deg)',
+    backgroundColor: '#e0e7ff',
+});
+
+// 답변 영역 컨테이너
+export const answerContainer = style({
+    overflow: 'hidden',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+});
+
+// 답변 영역 (확장됨)
+export const answerExpanded = style({
+    animation: `${expandAnimation} 0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
+});
+
+// 답변 내용
+export const answerContent = style({
+    padding: '16px 18px 12px 24px', // top: 20px, right: 18px, bottom: 12px, left: 32px (질문 번호와 정렬)
+    borderTop: '1px solid #f1f5f9',
+    backgroundColor: '#fafbff',
+});
+
+// 답변 레이블
+export const answerLabel = style({
+    ...textStyles.body1,
+    color: '#6366f1',
+    fontWeight: '600',
+    fontSize: '13px',
+    marginBottom: '8px',
+    display: 'block',
+});
+
+// 답변 텍스트
+export const answerText = style({
+    ...textStyles.newBody,
+    color: '#4b5563',
+    lineHeight: '1.7',
+    letterSpacing: '-0.01em',
 });
 
 // 레거시 호환성을 위한 별칭
@@ -131,6 +217,31 @@ globalStyle('.question-text-span', {
     color: 'inherit',
 });
 
+// 답변 영역의 마크다운 스타일
+globalStyle('.answer-inline-code', {
+    backgroundColor: '#e0e7ff',
+    color: '#4338ca',
+    padding: '3px 8px',
+    borderRadius: '5px',
+    fontSize: '13px',
+    fontFamily: 'SF Mono, Monaco, Inconsolata, Roboto Mono, monospace',
+    fontWeight: '500',
+});
+
+globalStyle('.answer-bold', {
+    fontWeight: '600',
+    color: '#374151',
+});
+
+globalStyle('.answer-italic', {
+    fontStyle: 'italic',
+    color: '#6b7280',
+});
+
+globalStyle('.answer-text-span', {
+    color: 'inherit',
+});
+
 // 질문 컨테이너 내 마크다운 요소 간격 조정
 globalStyle(`${questionContent} > div`, {
     margin: '0',
@@ -138,5 +249,19 @@ globalStyle(`${questionContent} > div`, {
 });
 
 globalStyle(`${questionContent} br`, {
-    display: 'none', // 불필요한 줄바꿈 제거
+    display: 'none',
+});
+
+// 답변 영역 내 마크다운 요소 간격 조정
+globalStyle(`${answerText} > div`, {
+    margin: '4px 0',
+});
+
+globalStyle(`${answerText} p`, {
+    margin: '0 0 8px 0',
+});
+
+globalStyle(`${answerText} br`, {
+    display: 'block',
+    marginBottom: '4px',
 }); 

@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { SizeConfig } from '@/styles/SizeConfig';
+import { SizeConfig } from '@/styles/sizeConfig';
 
 export const container = style({
     display: 'flex',

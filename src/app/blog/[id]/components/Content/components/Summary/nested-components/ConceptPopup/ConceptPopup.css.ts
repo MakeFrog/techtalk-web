@@ -1,5 +1,5 @@
 import { style } from '@vanilla-extract/css';
-import { ColorSet } from '@/styles/ColorSet';
+import { ColorSet } from '@/styles/colorSet';
 
 export const popupOverlay = style({
     position: 'fixed',

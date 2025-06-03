@@ -1,6 +1,6 @@
 import { textStyles } from '@/styles/TextStyles';
 import { style, globalStyle } from '@vanilla-extract/css';
-import { SizeConfig } from '@/styles/SizeConfig';
+import { SizeConfig } from '@/styles/sizeConfig';
 
 // 컨테이너 스타일 - 자연스러운 배경
 export const contentContainer = style({

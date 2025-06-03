@@ -1,4 +1,4 @@
-import { textStyles } from '@/styles/TextStyles';
+import { textStyles } from '@/styles/textStyles';
 import { style } from '@vanilla-extract/css';
 
 export const container = style({

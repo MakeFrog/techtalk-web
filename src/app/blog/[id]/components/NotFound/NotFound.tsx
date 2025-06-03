@@ -24,9 +24,9 @@ export default function NotFound({ documentId }: NotFoundProps) {
                 문서가 삭제되었거나 URL이 잘못되었을 수 있습니다.
             </p>
 
-            <Link href="/blog" className={backButton}>
+            {/* <Link href="/blog" className={backButton}>
                 블로그 목록으로 돌아가기
-            </Link>
+            </Link> */}
         </div>
     );
 } 

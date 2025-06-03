@@ -1,35 +1,83 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { parseMarkdownWithPreset } from '@/utils/markdownParser';
 import { Question } from "@/domains/blog/hooks/useQuestionStream";
 import { LoadingSpinner } from '@/components/loading/LoadingSpinner';
 import {
     orderedList,
     listItem,
+    questionHeader,
     questionContent,
     questionNumber,
+    answerContainer,
+    answerExpanded,
+    answerContent,
+    answerLabel,
+    answerText,
     loadingContainer,
     errorContainer,
     emptyContainer
 } from "./QuestionListView.css";
 
-// 개별 질문 아이템 컴포넌트 - 질문만 표시 (답변은 숨김)
+// 개별 질문 아이템 컴포넌트 - 클릭 시 답변 토글
 interface QuestionItemProps {
     question: Question;
     index: number;
 }
 
 const QuestionItem = React.memo(function QuestionItem({ question, index }: QuestionItemProps) {
-    // 질문 마크다운 파싱
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    // 답변이 있는지 확인
+    const hasAnswer = question.answer && question.answer.trim().length > 0;
+
+    // 질문과 답변 마크다운 파싱
     const parsedQuestion = useMemo(() => {
         return parseMarkdownWithPreset(question.question, 'question');
     }, [question.question]);
 
+    const parsedAnswer = useMemo(() => {
+        if (!hasAnswer) return null;
+        return parseMarkdownWithPreset(question.answer, 'comment', {
+            inlineCodeClassName: 'answer-inline-code',
+            textSpanClassName: 'answer-text-span',
+            boldClassName: 'answer-bold',
+            italicClassName: 'answer-italic',
+        });
+    }, [question.answer, hasAnswer]);
+
+    const handleToggle = () => {
+        if (hasAnswer) {
+            setIsExpanded(!isExpanded);
+        }
+    };
+
     return (
         <li className={listItem}>
-            <span className={questionNumber}>{index + 1}</span>
-            <div className={questionContent}>
-                {parsedQuestion}
+            {/* 질문 헤더 - 답변이 있을 때만 클릭 가능 */}
+            <div
+                className={questionHeader}
+                onClick={handleToggle}
+                style={{
+                    cursor: hasAnswer ? 'pointer' : 'default',
+                }}
+            >
+                <span className={questionNumber}>{index + 1}</span>
+                <div className={questionContent}>
+                    {parsedQuestion}
+                </div>
             </div>
+
+            {/* 답변 영역 (답변이 있고 확장된 경우에만 표시) */}
+            {hasAnswer && isExpanded && (
+                <div className={`${answerContainer} ${answerExpanded}`}>
+                    <div className={answerContent}>
+                        <span className={answerLabel}>💡 모범 답변</span>
+                        <div className={answerText}>
+                            {parsedAnswer}
+                        </div>
+                    </div>
+                </div>
+            )}
         </li>
     );
 });
@@ -37,12 +85,14 @@ const QuestionItem = React.memo(function QuestionItem({ question, index }: Quest
 // 추가 로딩 컴포넌트 (스트림 중일 때 표시)
 const AdditionalLoadingItem = React.memo(function AdditionalLoadingItem() {
     return (
-        <li className={listItem} style={{ opacity: 0.7 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <LoadingSpinner size="small" layout="inline" />
-                <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                    질문을 생성하고 있습니다...
-                </span>
+        <li className={listItem}>
+            <div className={questionHeader}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                    <LoadingSpinner size="small" layout="inline" />
+                    <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                        질문을 생성하고 있습니다...
+                    </span>
+                </div>
             </div>
         </li>
     );
@@ -55,9 +105,13 @@ interface QuestionListViewProps {
 }
 
 /**
- * 면접 질문 리스트를 표시하는 컴포넌트 (스트림 버전)
- * 질문을 하나씩 실시간으로 표시하고, 로딩 중일 때 추가 스피너 표시
- * 답변은 숨기고 질문만 표시 (데이터는 유지하여 추후 기능 확장 가능)
+ * 면접 질문 리스트를 표시하는 컴포넌트 (클릭 가능한 답변 토글 버전)
+ * 
+ * 기능:
+ * - 질문을 하나씩 실시간으로 표시
+ * - 질문 클릭 시 모범 답변 토글 (세련된 애니메이션)
+ * - 마크다운 파싱을 통한 질문/답변 포맷팅
+ * - 로딩 상태 및 에러 처리
  */
 export function QuestionListView({ questions, isLoading, error }: QuestionListViewProps) {
     // 디버깅용 로그
@@ -68,7 +122,9 @@ export function QuestionListView({ questions, isLoading, error }: QuestionListVi
         questionsPreview: questions.map((q, i) => ({
             index: i,
             questionPreview: q.question.substring(0, 30) + '...',
-            questionLength: q.question.length
+            answerPreview: q.answer.substring(0, 30) + '...',
+            questionLength: q.question.length,
+            answerLength: q.answer.length
         }))
     });
 
@@ -132,7 +188,7 @@ export function QuestionListView({ questions, isLoading, error }: QuestionListVi
             {/* 생성된 질문들 표시 */}
             {uniqueQuestions.map((question, index) => (
                 <QuestionItem
-                    key={`question-${index}-${question.question.substring(0, 20)}`} // 더 고유한 키
+                    key={`question-${index}-${question.question.substring(0, 20)}`}
                     question={question}
                     index={index}
                 />

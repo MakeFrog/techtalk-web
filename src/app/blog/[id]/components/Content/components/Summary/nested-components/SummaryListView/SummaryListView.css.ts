@@ -1,6 +1,6 @@
 import { style, keyframes, globalStyle } from "@vanilla-extract/css";
 import { textStyles } from "@/styles/TextStyles";
-import { ColorSet } from "@/styles/ColorSet";
+import { ColorSet } from "@/styles/colorSet";
 
 // 스피너 애니메이션
 const spin = keyframes({

@@ -35,7 +35,7 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
     const tocItems = useMemo(() => {
         if (!analyzedState.toc) return [];
         return analyzedState.toc.map((title, index) => ({
-            id: index,
+            id: index + 1,
             title
         }));
     }, [analyzedState.toc]);

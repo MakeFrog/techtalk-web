@@ -1,64 +1,84 @@
 'use client';
 
-import React from 'react';
-import { title } from "./ContentHeader.css";
+import React from "react";
+import { Gap } from "@/components/gap/Gap.tsx";
+import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
+import { LoadingSpinner } from '@/components/loading/LoadingSpinner/LoadingSpinner';
+import { ThumbnailImage } from "@/components/Image/Thumbnail/ThumbnailImage";
 import { TechSetList } from './nested-component/TechSetList';
-import { useBlogBasicInfo } from '@/domains/blog/providers/BlogBasicInfoProvider';
-import { ThumbnailImage } from '@/components/Image/Thumbnail/ThumbnailImage';
-import { isMobileDevice } from '@/utils/clientUtils';
+import {
+    container,
+    headerSection,
+    titleContainer,
+    title,
+    loadingContainer,
+    errorContainer
+} from "./ContentHeader.css";
 
-export default function ContentHeader() {
+const ContentHeader = React.memo(() => {
     const { state } = useBlogBasicInfo();
 
-    // 로딩 중일 때
+    // 로딩 상태 최적화 - 빠른 피드백
     if (state.status === 'loading') {
         return (
-            <div>
-                <h1 className={title}>로딩 중...</h1>
-                <TechSetList skillIds={[]} jobGroupIds={[]} />
+            <div className={container}>
+                <div className={loadingContainer}>
+                    <LoadingSpinner size="small" layout="center" />
+                </div>
             </div>
         );
     }
 
-    // 에러일 때
+    // 에러 상태
     if (state.status === 'error') {
         return (
-            <div>
-                <h1 className={title}>데이터 로드 실패</h1>
-                <p style={{ color: '#ef4444', fontSize: '14px' }}>Error: {state.error}</p>
+            <div className={container}>
+                <div className={errorContainer}>
+                    블로그 정보를 불러올 수 없습니다.
+                </div>
             </div>
         );
     }
 
-    // 성공적으로 데이터를 가져온 경우 - 직접 destructuring으로 데이터 접근
     const { title: blogTitle, skillIds, jobGroupIds, thumbnailUrl } = state.data;
 
     // 썸네일이 있을 때만 디버깅 로그 출력
-    if (thumbnailUrl) {
+    if (thumbnailUrl && process.env.NODE_ENV === 'development') {
         console.log('🖼️ [ContentHeader] 썸네일 URL 발견:', thumbnailUrl);
     }
 
-    // 모바일 여부에 따라 aspectRatio 결정
-    const isMobile = isMobileDevice();
-    const aspectRatio = isMobile ? "16/8.5" : "12/6";
-
     return (
-        <div>
-            <h1 className={title}>{blogTitle}</h1>
+        <header className={container}>
+            <section className={headerSection}>
+                <div className={titleContainer}>
+                    <h1 className={title}>{blogTitle}</h1>
+                </div>
 
-            <TechSetList skillIds={skillIds} jobGroupIds={jobGroupIds} />
+                <Gap size={12} />
 
-            {thumbnailUrl && (
-                <ThumbnailImage
-                    src={thumbnailUrl}
-                    alt={blogTitle}
-                    aspectRatio={aspectRatio}
-                    borderRadius={12}
-                    style={{ marginBottom: '20px' }}
-                />
-            )}
-        </div>
+                {/* 기술 스택 섹션 - 기존 TechSetList 컴포넌트 사용 */}
+                <TechSetList skillIds={skillIds} jobGroupIds={jobGroupIds} />
+
+                {/* 썸네일 표시 - 있을 때만 */}
+                {thumbnailUrl && (
+                    <>
+                        <Gap size={8} />
+                        <ThumbnailImage
+                            src={thumbnailUrl}
+                            alt={blogTitle}
+                            aspectRatio="16/9"
+                            borderRadius={12}
+                            priority={true} // 중요한 이미지로 우선 로딩
+                        />
+                    </>
+                )}
+            </section>
+        </header>
     );
-}
+});
+
+ContentHeader.displayName = 'ContentHeader';
+
+export default ContentHeader;
 
 

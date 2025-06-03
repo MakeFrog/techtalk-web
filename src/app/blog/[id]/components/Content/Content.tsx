@@ -2,13 +2,23 @@
 
 import { Gap } from "@/components/gap/Gap.tsx";
 import ContentHeader from "./components/ContentHeader/ContentHeader.tsx";
-import { InsightSectionView } from "./components/Insight/InsightSectionView.tsx";
 import { container, loadingContainer, errorContainer, errorDetailText } from "./Content.css.ts";
-import { QuestionSectionView } from "./components/Question/QuestionSectionView.tsx";
-import { SummarySectionView } from "./components/Summary/SummarySectionView.tsx";
 import { useInsightStream } from "@/domains/blog/hooks/useInsightStream";
 import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
+import { LoadingSpinner } from "@/components/loading/LoadingSpinner/LoadingSpinner.tsx";
+
+// 비필수 컴포넌트들을 지연 로딩으로 변경 (초기 번들 크기 감소)
+const InsightSectionView = lazy(() => import("./components/Insight/InsightSectionView.tsx").then(module => ({ default: module.InsightSectionView })));
+const QuestionSectionView = lazy(() => import("./components/Question/QuestionSectionView.tsx").then(module => ({ default: module.QuestionSectionView })));
+const SummarySectionView = lazy(() => import("./components/Summary/SummarySectionView.tsx").then(module => ({ default: module.SummarySectionView })));
+
+// 로딩 폴백 컴포넌트
+const SectionLoader = () => (
+    <div className={loadingContainer}>
+        <LoadingSpinner size="small" layout="center" />
+    </div>
+);
 
 export default function Content() {
     // BlogBasicInfoProvider에서 데이터와 상태 가져오기
@@ -22,11 +32,13 @@ export default function Content() {
         if (state.status === 'success' && insightState.status === 'idle') {
             const { title, content } = state.data;
 
-            console.log('⚡ [Content] 인사이트 스트리밍 시작:', {
-                title: title.substring(0, 50) + '...',
-                contentLength: content.length,
-                insightState: insightState.status
-            });
+            if (process.env.NODE_ENV === 'development') {
+                console.log('⚡ [Content] 인사이트 스트리밍 시작:', {
+                    title: title.substring(0, 50) + '...',
+                    contentLength: content.length,
+                    insightState: insightState.status
+                });
+            }
 
             startInsightStreaming({
                 title: title,
@@ -66,11 +78,23 @@ export default function Content() {
         <section className={container}>
             <ContentHeader />
             <Gap size={24} />
-            <InsightSectionView streamState={insightState} />
+
+            {/* 지연 로딩된 컴포넌트들을 Suspense로 감싸기 */}
+            <Suspense fallback={<SectionLoader />}>
+                <InsightSectionView streamState={insightState} />
+            </Suspense>
+
             <Gap size={20} />
-            <QuestionSectionView />
+
+            <Suspense fallback={<SectionLoader />}>
+                <QuestionSectionView />
+            </Suspense>
+
             <Gap size={24} />
-            <SummarySectionView />
+
+            <Suspense fallback={<SectionLoader />}>
+                <SummarySectionView />
+            </Suspense>
         </section>
     );
 }   

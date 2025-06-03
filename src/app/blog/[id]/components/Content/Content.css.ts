@@ -1,5 +1,4 @@
 import { style } from '@vanilla-extract/css';
-import { SizeConfig } from '@/styles/sizeConfig';
 
 export const container = style({
     margin: '0 auto',

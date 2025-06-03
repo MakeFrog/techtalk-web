@@ -1,34 +1,44 @@
 'use client';
 
-import React from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useTechSetCache } from '@/domains/techset/hooks/useTechSetCache';
 
+// Context 생성
+const TechSetCacheContext = createContext<ReturnType<typeof useTechSetCache> | null>(null);
+
 interface TechSetCacheProviderProps {
-    children: React.ReactNode;
+    children: ReactNode;
 }
 
 /**
- * TechSet 캐시를 백그라운드에서 초기화하는 프로바이더
- * 
- * - 로딩 상태는 사용자에게 보여주지 않음 (백그라운드 로딩)
- * - 캐시 실패해도 웹사이트 동작에 영향 없음
- * - 예측 가능한 상태 관리 (Discriminated Union)
+ * 기술 스택 캐시를 애플리케이션 전체에서 사용할 수 있도록 제공하는 Provider
+ * 앱 시작 시 한 번만 초기화되어 모든 컴포넌트에서 캐시된 데이터 사용
  */
 export function TechSetCacheProvider({ children }: TechSetCacheProviderProps) {
-    // 백그라운드에서 캐시 초기화 (UI에 영향 없음)
-    const cacheResult = useTechSetCache();
+    const cacheState = useTechSetCache();
 
-    // 개발 환경에서만 콘솔에 상태 로깅
+    // 개발 환경에서만 로그 출력
     if (process.env.NODE_ENV === 'development') {
-        if (cacheResult.status === 'error') {
-            console.warn('⚠️ [TechSetCache] 캐시 로딩 실패:', cacheResult.error);
-            console.warn('⚠️ [TechSetCache] TechSet 이름이 ID로 표시됩니다.');
-        } else if (cacheResult.status === 'success') {
-            console.log('✅ [TechSetCache] 캐시 로딩 완료');
-        }
+        console.log('🎯 [TechSetCacheProvider] 상태:', {
+            status: cacheState.status,
+            error: cacheState.error
+        });
     }
 
-    // 캐시 상태와 관계없이 항상 자식 컴포넌트 렌더링
-    // TechSet 실패해도 웹사이트는 정상 동작
-    return <>{children}</>;
+    return (
+        <TechSetCacheContext.Provider value={cacheState}>
+            {children}
+        </TechSetCacheContext.Provider>
+    );
+}
+
+/**
+ * TechSetCacheProvider에서 제공하는 캐시 상태를 사용하는 Hook
+ */
+export function useTechSetCacheContext() {
+    const context = useContext(TechSetCacheContext);
+    if (!context) {
+        throw new Error('useTechSetCacheContext는 TechSetCacheProvider 내부에서만 사용할 수 있습니다.');
+    }
+    return context;
 } 

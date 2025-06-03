@@ -3,16 +3,18 @@ import Image from 'next/image';
 import React, { useState } from 'react';
 import * as styles from './ThumbnailImage.css';
 
-interface ThumbnailImageProps {
+export interface ThumbnailImageProps {
     src: string;
     alt?: string;
-    width?: number | string;
-    aspectRatio?: number | string;
-    maxWidth?: number | string;
-    maxHeight?: number | string;
+    width?: string | number;
+    height?: string | number;
+    maxWidth?: string | number;
+    maxHeight?: string | number;
+    aspectRatio?: string;
     className?: string;
     style?: React.CSSProperties;
-    borderRadius?: number | string;
+    borderRadius?: number;
+    priority?: boolean;
 }
 
 function parseAspectRatio(ratio?: number | string): number | undefined {
@@ -50,6 +52,7 @@ export function ThumbnailImage({
     className,
     style,
     borderRadius = 16,
+    priority = false,
 }: ThumbnailImageProps) {
     const [loaded, setLoaded] = useState(false);
     const isAllowed = isAllowedDomain(src);
@@ -114,6 +117,7 @@ export function ThumbnailImage({
                     sizes="100vw"
                     draggable={false}
                     onLoadingComplete={() => setLoaded(true)}
+                    priority={priority}
                 />
             ) : (
                 <img

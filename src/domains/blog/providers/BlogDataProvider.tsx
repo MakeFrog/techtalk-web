@@ -24,7 +24,6 @@ interface BlogDataProviderProps {
 
 /**
  * 블로그 documentId와 문서 존재 여부를 자식 컴포넌트들에게 제공하는 Provider
- * toss-frontend 가이드라인: Discriminated Union과 단일 책임 원칙 준수
  */
 export function BlogDataProvider({
     children,

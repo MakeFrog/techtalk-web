@@ -10,7 +10,6 @@ interface TechSetCacheProviderProps {
 /**
  * TechSet 캐시를 백그라운드에서 초기화하는 프로바이더
  * 
- * toss-frontend 가이드라인에 따른 개선:
  * - 로딩 상태는 사용자에게 보여주지 않음 (백그라운드 로딩)
  * - 캐시 실패해도 웹사이트 동작에 영향 없음
  * - 예측 가능한 상태 관리 (Discriminated Union)

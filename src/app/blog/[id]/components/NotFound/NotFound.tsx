@@ -7,7 +7,6 @@ interface NotFoundProps {
 
 /**
  * 블로그 문서를 찾을 수 없을 때 표시되는 세련된 UI 컴포넌트
- * toss-frontend 가이드라인: 단일 책임 원칙과 명확한 사용자 경험 제공
  */
 export default function NotFound({ documentId }: NotFoundProps) {
     return (

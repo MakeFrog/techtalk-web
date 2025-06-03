@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { parseMarkdownWithPreset } from '@/utils/markdownParser';
 import { InsightStreamState } from '@/domains/blog/hooks/useInsightStream';
+import { LoadingSpinner } from '@/components/loading/LoadingSpinner/LoadingSpinner';
 import * as styles from './InsightContentView.css';
 
 // 즉시 표시 Hook (딜레이 없음)
@@ -30,12 +31,14 @@ const ErrorMessage = React.memo(function ErrorMessage({ message }: { message: st
     );
 });
 
-// 빈 상태 컴포넌트
+// 빈 상태 컴포넌트 - LoadingSpinner 사용
 const EmptyState = React.memo(function EmptyState() {
     return (
         <div className={styles.emptyContainer}>
-            <span className={styles.emptyIcon}>💭</span>
-            <p className={styles.emptyText}>인사이트를 분석 중입니다...</p>
+            <LoadingSpinner
+                size="medium"
+                layout="center"
+            />
         </div>
     );
 });

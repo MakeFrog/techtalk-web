@@ -1,5 +1,6 @@
 import { textStyles } from '@/styles/TextStyles';
 import { style, globalStyle } from '@vanilla-extract/css';
+import { SizeConfig } from '@/styles/SizeConfig';
 
 // 컨테이너 스타일 - 자연스러운 배경
 export const contentContainer = style({
@@ -16,6 +17,14 @@ export const contentContainer = style({
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     position: 'relative',
     overflow: 'hidden',
+
+    // 모바일/웹뷰에서 여백 줄이기
+    '@media': {
+        [`screen and (max-width: ${SizeConfig.MOBILE_WIDTH}px)`]: {
+            padding: '12px 16px',
+            borderRadius: '8px',
+        }
+    }
 });
 
 // 메인 텍스트 컨테이너

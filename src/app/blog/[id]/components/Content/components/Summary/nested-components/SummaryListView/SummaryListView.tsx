@@ -186,21 +186,20 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
                         {parsedContent && (
                             <div>
                                 {parsedContent}
-                                {/* 스트리밍 중임을 나타내는 커서 표시 */}
-                                <span style={{
-                                    animation: 'blink 1s infinite',
-                                    fontSize: '1.2em',
-                                    color: '#A855F7'
-                                }}>▊</span>
                             </div>
                         )}
-                        {!parsedContent && (
+                        {/* 스트리밍 중에는 항상 로딩 스피너 표시 */}
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            padding: '20px 0'
+                        }}>
                             <LoadingSpinner
                                 size="medium"
                                 layout="center"
-                                message="요약을 생성하고 있습니다..."
                             />
-                        )}
+                        </div>
                     </div>
                 );
 

@@ -72,7 +72,26 @@ const SummaryListViewComponent: React.FC<SummaryListViewProps> = ({ onTocReady }
 
     // 마크다운 텍스트 전처리 함수 - 불필요한 공백 제거
     const preprocessMarkdown = useCallback((text: string): string => {
-        const processed = text
+        let processed = text;
+
+        // 전체 텍스트가 ```markdown으로 감싸져 있는 경우 제거
+        if (processed.startsWith('```markdown') && processed.endsWith('```')) {
+            console.log('🔧 [SummaryListView] 마크다운 코드 블록 감싸기 제거');
+            processed = processed
+                .replace(/^```markdown\s*\n?/, '') // 시작 부분 제거
+                .replace(/\n?\s*```$/, ''); // 끝 부분 제거
+        }
+
+        // 전체 텍스트가 ```으로만 감싸져 있는 경우도 제거 (언어 명시 없이)
+        if (processed.startsWith('```') && processed.endsWith('```') && !processed.includes('\n```')) {
+            console.log('🔧 [SummaryListView] 일반 코드 블록 감싸기 제거');
+            processed = processed
+                .replace(/^```\s*\n?/, '') // 시작 부분 제거
+                .replace(/\n?\s*```$/, ''); // 끝 부분 제거
+        }
+
+        // 기존 전처리 로직
+        processed = processed
             // 제목 뒤의 빈 줄 제거 (## 제목\n\n- 리스트 -> ## 제목\n- 리스트)
             .replace(/^(#{1,6}.*)\n\n(-|\*)/gm, '$1\n$2')
             // 코드 블록 위의 줄바꿈 제거

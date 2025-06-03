@@ -96,9 +96,11 @@ export function QuestionListView({ questions, isLoading, error }: QuestionListVi
     // 질문이 없고 로딩도 아닐 때
     if (questions.length === 0 && !isLoading) {
         return (
-            <div className={emptyContainer}>
-                아직 생성된 질문이 없습니다.
-            </div>
+            <LoadingSpinner
+                size="medium"
+                layout="center"
+                message="면접 질문을 생성하고 있습니다..."
+            />
         );
     }
 

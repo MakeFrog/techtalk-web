@@ -11,6 +11,7 @@ import {
     answerContainer,
     answerExpanded,
     answerContent,
+    answerContentExpanded,
     answerLabel,
     answerText,
     loadingContainer,
@@ -67,10 +68,10 @@ const QuestionItem = React.memo(function QuestionItem({ question, index }: Quest
                 </div>
             </div>
 
-            {/* 답변 영역 (답변이 있고 확장된 경우에만 표시) */}
-            {hasAnswer && isExpanded && (
-                <div className={`${answerContainer} ${answerExpanded}`}>
-                    <div className={answerContent}>
+            {/* 답변 영역 (항상 렌더링하되 CSS로 애니메이션 제어) */}
+            {hasAnswer && (
+                <div className={`${answerContainer} ${isExpanded ? answerExpanded : ''}`}>
+                    <div className={`${answerContent} ${isExpanded ? answerContentExpanded : ''}`}>
                         <span className={answerLabel}>💡 모범 답변</span>
                         <div className={answerText}>
                             {parsedAnswer}
@@ -143,7 +144,6 @@ export function QuestionListView({ questions, isLoading, error }: QuestionListVi
                 <LoadingSpinner
                     size="medium"
                     layout="center"
-                    message="면접 질문을 생성하고 있습니다..."
                 />
             </div>
         );
@@ -155,7 +155,6 @@ export function QuestionListView({ questions, isLoading, error }: QuestionListVi
             <LoadingSpinner
                 size="medium"
                 layout="center"
-                message="면접 질문을 생성하고 있습니다..."
             />
         );
     }

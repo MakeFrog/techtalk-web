@@ -112,8 +112,9 @@ export const questionNumber = style({
     fontSize: '14px',
     minWidth: 'auto',
     flexShrink: 0,
-    marginTop: '1px',
+    marginTop: '2px',
     marginRight: '2px',
+    lineHeight: '1.65',
     selectors: {
         '&::after': {
             content: '"."',
@@ -129,6 +130,7 @@ export const questionContent = style({
     color: '#374151',
     letterSpacing: '-0.01em',
     lineHeight: '1.65',
+    marginTop: '0',
 });
 
 // 토글 아이콘 컨테이너
@@ -155,20 +157,31 @@ export const toggleIconExpanded = style({
 
 // 답변 영역 컨테이너
 export const answerContainer = style({
+    maxHeight: '0',
+    opacity: '0',
     overflow: 'hidden',
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
 });
 
 // 답변 영역 (확장됨)
 export const answerExpanded = style({
-    animation: `${expandAnimation} 0.3s cubic-bezier(0.4, 0, 0.2, 1)`,
+    maxHeight: '1000px',
+    opacity: '1',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
 });
 
 // 답변 내용
 export const answerContent = style({
-    padding: '16px 18px 12px 24px', // top: 20px, right: 18px, bottom: 12px, left: 32px (질문 번호와 정렬)
+    padding: '12px 16px 12px 24px', // 상:12px 우:12px 하:18px 좌:24px
     borderTop: '1px solid #f1f5f9',
     backgroundColor: '#fafbff',
+    transform: 'translateY(-10px)',
+    transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1) 0.01s',
+});
+
+// 답변 내용 (확장된 상태)
+export const answerContentExpanded = style({
+    transform: 'translateY(0)',
 });
 
 // 답변 레이블

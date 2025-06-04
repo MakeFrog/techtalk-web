@@ -1,0 +1,24 @@
+{
+    "name": "techtalk",
+    "buildCommand": "npm run build:prod",
+    "outputDirectory": ".next",
+    "framework": "nextjs",
+    "installCommand": "npm install",
+    "env": {
+        "NEXT_PUBLIC_FIREBASE_ENV": "prod"
+    },
+    "functions": {
+        "src/app/**/*.ts": {
+            "runtime": "nodejs18.x"
+        }
+    },
+    "regions": [
+        "icn1"
+    ],
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/$1"
+        }
+    ]
+}

@@ -43,3 +43,26 @@ next-env.d.ts
 
 # cursor editor
 .cursor
+
+# Firebase
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Firebase Service Account Keys (중요!)
+*-service-account-key.json
+service-account-*.json
+firebase-adminsdk-*.json
+
+# Firebase Emulator Local Data
+.firebase/
+firebase-export-*/
+dataconnect/.dataconnect/pgliteData/
+
+# Firebase Cache
+.firebaserc.cache
+
+# Firebase Functions
+functions/node_modules/
+functions/.env*
+functions/lib/

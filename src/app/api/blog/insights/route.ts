@@ -4,7 +4,7 @@ import { updateAnalyzedInfo, checkFieldExists } from '@/domains/blog/services/an
 import { generateInsightStream } from '@/domains/blog/services/geminiService';
 
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
 
 // Rate limiting을 위한 유틸리티 함수들
 async function sleep(ms: number) {

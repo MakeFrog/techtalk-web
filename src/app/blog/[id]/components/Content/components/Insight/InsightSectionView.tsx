@@ -4,9 +4,11 @@ import { Gap } from "@/components/gap/Gap";
 import { EmojiPrefixedTitle } from "@/components/text/EmojiPrefixedTitle/EmojiPrefixedTitle";
 import { InsightStreamState } from "@/domains/blog/hooks/useInsightStream";
 import { InsightContentView } from "./nested-components/InsightContentView";
+import * as styles from "./nested-components/InsightContentView.css";
 
 interface InsightSectionViewProps {
     streamState: InsightStreamState;
+
 }
 
 /**
@@ -22,4 +24,16 @@ export function InsightSectionView({ streamState }: InsightSectionViewProps) {
         </div>
     );
 }
+
+export const InsightSectionViewLoader = () => {
+    return (
+        <div>
+            <EmojiPrefixedTitle emoji="💡" title="핵심 인사이트" />
+            <Gap size={12} />
+            <div className={styles.contentContainer} style={{ minHeight: '200px' }}>
+
+            </div>
+        </div>
+    );
+};
 

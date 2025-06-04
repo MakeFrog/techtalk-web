@@ -6,19 +6,15 @@ import { container, loadingContainer, errorContainer, errorDetailText } from "./
 import { useInsightStream } from "@/domains/blog/hooks/useInsightStream";
 import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
 import { useEffect, Suspense, lazy } from "react";
-import { LoadingSpinner } from "@/components/loading/LoadingSpinner/LoadingSpinner.tsx";
+
+import { InsightSectionViewLoader } from "./components/Insight/InsightSectionView.tsx";
+import SectionLoader from "@/components/loading/SectionLoader/SectionLoader.tsx";
 
 // 비필수 컴포넌트들을 지연 로딩으로 변경 (초기 번들 크기 감소)
 const InsightSectionView = lazy(() => import("./components/Insight/InsightSectionView.tsx").then(module => ({ default: module.InsightSectionView })));
 const QuestionSectionView = lazy(() => import("./components/Question/QuestionSectionView.tsx").then(module => ({ default: module.QuestionSectionView })));
 const SummarySectionView = lazy(() => import("./components/Summary/SummarySectionView.tsx").then(module => ({ default: module.SummarySectionView })));
 
-// 로딩 폴백 컴포넌트
-const SectionLoader = () => (
-    <div className={loadingContainer}>
-        <LoadingSpinner size="small" layout="center" />
-    </div>
-);
 
 export default function Content() {
     // BlogBasicInfoProvider에서 데이터와 상태 가져오기
@@ -80,7 +76,7 @@ export default function Content() {
             <Gap size={24} />
 
             {/* 지연 로딩된 컴포넌트들을 Suspense로 감싸기 */}
-            <Suspense fallback={<SectionLoader />}>
+            <Suspense fallback={<InsightSectionViewLoader />}>
                 <InsightSectionView streamState={insightState} />
             </Suspense>
 

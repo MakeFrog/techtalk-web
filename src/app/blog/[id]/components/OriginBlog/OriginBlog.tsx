@@ -3,6 +3,7 @@
 import { useBlogBasicInfo } from "@/domains/blog/providers/BlogBasicInfoProvider";
 import { PlaceHolder } from "@/components/view/PlaceHolder/PlaceHolder"
 import { originBlogView, noLinkMessage, noLinkText, originLinkContainer, originLinkTitle, originDescription, originLinkButton } from "./OriginBlog.css"
+import { WebsiteStructuredData } from "@/components/SEO";
 
 export default function OriginBlog() {
     const { state } = useBlogBasicInfo();
@@ -10,9 +11,7 @@ export default function OriginBlog() {
     // 로딩 중이거나 에러일 때
     if (state.status === 'loading') {
         return (
-            <section className={originBlogView}>
-                <PlaceHolder />
-            </section>
+            <WebsiteStructuredData />
         );
     }
 

@@ -66,3 +66,6 @@ dataconnect/.dataconnect/pgliteData/
 functions/node_modules/
 functions/.env*
 functions/lib/
+
+# Large Demo Files
+assets/demo/*.gif

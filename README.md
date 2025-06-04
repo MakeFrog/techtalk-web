@@ -23,7 +23,7 @@ AI 모의 면접을 대표 기능으로 하며, 개발자들이 겪는 가장 �
     <th align="center">블로그 요약 상세페이지</th>
   </tr>
   <tr>
-    <td align="center"><img src="blob:https://velog.io/4b07a996-ba13-4687-bf35-49c956c5719f" width="600"/></td>
+    <td align="center"><img src="https://velog.velcdn.com/images/ximya_hf/post/d59e750f-5249-4dab-a335-a103420e210a/image.gif"/></td>
   </tr>
 </table>
     
